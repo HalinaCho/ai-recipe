@@ -167,7 +167,10 @@ export function parseInstructions(row: CookRcp01Row): string[] {
   return steps;
 }
 
-function toNumber(value: string | undefined): number {
-  const parsed = Number((value ?? "").trim());
-  return Number.isFinite(parsed) ? parsed : 0;
+/** 읽을 수 없는 영양 수치는 0이 아니라 null이다 — 없는 것과 0은 다르다. */
+function toNumber(value: string | undefined): number | null {
+  const raw = (value ?? "").trim();
+  if (raw === "") return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
 }

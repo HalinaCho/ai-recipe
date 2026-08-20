@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { TopAppBar } from "@/components/ui/TopAppBar";
-import { PreviewBadge } from "@/components/inventory/PreviewBadge";
+import { PreviewBadge } from "@/components/ui/PreviewBadge";
 import { useRecipeDetail } from "@/lib/hooks/use-recipes";
 import { CookChecklistModal } from "./CookChecklistModal";
 import {

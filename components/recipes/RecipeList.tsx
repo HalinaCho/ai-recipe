@@ -1,6 +1,6 @@
 "use client";
 
-import { PreviewBadge } from "@/components/inventory/PreviewBadge";
+import { PreviewBadge } from "@/components/ui/PreviewBadge";
 import { useRecipes } from "@/lib/hooks/use-recipes";
 import { RecipeCard } from "./RecipeCard";
 import {

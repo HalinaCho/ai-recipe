@@ -11,7 +11,7 @@ import {
   InventoryErrorCard,
   InventoryListSkeleton,
 } from "./InventoryStates";
-import { PreviewBadge } from "./PreviewBadge";
+import { PreviewBadge } from "@/components/ui/PreviewBadge";
 
 /**
  * FR-04-02 / FR-05-02: one flat FIFO list (oldest purchase first, exactly as

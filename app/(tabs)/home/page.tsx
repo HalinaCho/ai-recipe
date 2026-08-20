@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { TopAppBar } from "@/components/ui/TopAppBar";
 import { EatSoonSummary } from "@/components/inventory/EatSoonSummary";
-import { PreviewBadge } from "@/components/inventory/PreviewBadge";
+import { PreviewBadge } from "@/components/ui/PreviewBadge";
 import { SyncPanel } from "@/components/inventory/SyncPanel";
 import { TodayRecipesSection } from "@/components/recipes/TodayRecipesSection";
 import { useSync } from "@/lib/hooks/use-sync";

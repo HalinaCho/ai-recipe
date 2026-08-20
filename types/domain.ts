@@ -79,12 +79,14 @@ export interface Recipe {
   name: string;
   imageUrl: string | null;
   instructions: string[];
+  // 소스에 영양정보가 없을 수 있고, DB 컬럼도 nullable이다. 없는 값을 0으로
+  // 채우면 "정보 없음"과 "나트륨 0"이 구분되지 않으므로 null을 그대로 둔다.
   nutrition: {
-    calories: number;
-    carbohydrate: number;
-    protein: number;
-    fat: number;
-    sodium: number;
+    calories: number | null;
+    carbohydrate: number | null;
+    protein: number | null;
+    fat: number | null;
+    sodium: number | null;
   };
   ingredients: RecipeIngredient[];
 }
