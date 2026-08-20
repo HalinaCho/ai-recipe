@@ -17,6 +17,34 @@ const INITIAL_LOOKBACK_DAYS = 30;
 /** 한 연결당 한 번에 처리할 메일 상한 — 크론 실행 시간을 묶어 둔다. */
 const DEFAULT_MAX_RESULTS = 50;
 
+/**
+ * 발신자가 등록된 쇼핑몰 도메인인지 다시 확인한다.
+ *
+ * 어댑터가 이미 걸러서 주지만, 여기서 한 번 더 본다. 사용자의 메일함에는
+ * 사적인 편지가 들어 있고 다음 줄에서 그 본문을 외부 LLM으로 보내므로,
+ * 어댑터의 필터가 언젠가 잘못 고쳐졌을 때 그 결과가 곧바로 개인정보 유출이
+ * 되어서는 안 된다. 이 검사는 그 경우에도 LLM 호출을 막는 마지막 방어선이다
+ * (NFR-01·NFR-02).
+ */
+function isFromRegisteredSender(
+  mail: RawMailMessage,
+  senderDomains: string[],
+): boolean {
+  // "쿠팡" <noreply@e.coupang.com> 형태에서 주소만 뽑는다.
+  const address = (mail.from.match(/<([^>]+)>/)?.[1] ?? mail.from)
+    .trim()
+    .toLowerCase();
+  const domain = address.split("@")[1];
+  if (!domain) return false;
+
+  // 서브도메인은 허용하되(e.coupang.com), 접미사만 같은 남의 도메인은
+  // 막는다(notcoupang.com).
+  return senderDomains.some((registered) => {
+    const target = registered.trim().toLowerCase();
+    return domain === target || domain.endsWith(`.${target}`);
+  });
+}
+
 /** 테스트에서 어댑터와 파서를 갈아 끼우기 위한 이음새. */
 export interface SyncDeps {
   createAdapter?: typeof createMailAdapter;
@@ -134,6 +162,15 @@ async function syncOneConnection(args: {
   let addedItemCount = 0;
 
   for (const mail of unseen) {
+    // LLM 호출 직전 마지막 확인. 처리 완료로 남기지 않고 그냥 건너뛴다 —
+    // 다음 동기화에서 다시 걸러질 뿐 본문이 나갈 일은 없다.
+    if (!isFromRegisteredSender(mail, senderDomains)) {
+      console.warn(
+        `[sync] 등록되지 않은 발신자의 메일을 건너뜁니다 (connection=${connection.id})`,
+      );
+      continue;
+    }
+
     // 파싱 실패가 인프라 문제라면 parseOrderMail이 던진다 — 그때는 이 메일을
     // 처리 완료로 남기지 않고 다음 동기화 때 다시 시도한다.
     const parsed = await parseMail(mail);
