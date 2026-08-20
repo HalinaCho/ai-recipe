@@ -104,18 +104,23 @@ export async function POST(request: Request) {
     );
   }
 
+  // 같은 메일함을 다시 연결하는 건 앱 비밀번호를 갱신하겠다는 뜻이다.
+  // 일반 insert면 마이그레이션 0004의 유니크 제약에 걸려 500이 난다.
   const { data, error } = await supabase
     .from("mail_connection")
-    .insert({
-      household_id: context.householdId,
-      connected_by_member_id: context.memberId,
-      provider: "naver",
-      email_address: emailAddress,
-      auth_type: "imap_app_password",
-      // NFR-03: 앱 비밀번호는 평문으로 남지 않는다.
-      encrypted_secret: encryptSecret(appPassword),
-      status: "active",
-    })
+    .upsert(
+      {
+        household_id: context.householdId,
+        connected_by_member_id: context.memberId,
+        provider: "naver",
+        email_address: emailAddress,
+        auth_type: "imap_app_password",
+        // NFR-03: 앱 비밀번호는 평문으로 남지 않는다.
+        encrypted_secret: encryptSecret(appPassword),
+        status: "active",
+      },
+      { onConflict: "household_id,provider,email_address" },
+    )
     .select()
     .single();
 
