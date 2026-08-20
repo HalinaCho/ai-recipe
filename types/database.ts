@@ -119,6 +119,24 @@ export interface Database {
         >;
         Relationships: [];
       };
+      shopping_sender_domain: {
+        Row: {
+          id: string;
+          household_id: string;
+          domain: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          domain: string;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["shopping_sender_domain"]["Insert"]
+        >;
+        Relationships: [];
+      };
       ingredient_icon_map: {
         Row: {
           normalized_name: string;

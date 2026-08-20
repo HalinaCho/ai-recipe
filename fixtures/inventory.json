@@ -1,0 +1,83 @@
+{
+  "_comment": "M1 kickoff fixture. Lets the screens track build the 재고/홈 tabs against realistic InventoryListResponse data before the sync backend lands. Shape must match InventoryListResponse in types/api.ts. Ordered oldest-purchase-first, matching the server's FIFO ordering (FR-04-02).",
+  "items": [
+    {
+      "id": "11111111-1111-4111-8111-111111111101",
+      "householdId": "00000000-0000-4000-8000-000000000001",
+      "normalizedName": "두부",
+      "rawName": "풀무원 국산콩 부침두부 300g",
+      "quantity": "1모",
+      "purchasedAt": "2026-08-06",
+      "sourceMailConnectionId": "22222222-2222-4222-8222-222222222201",
+      "status": "in_stock",
+      "consumedAt": null,
+      "consumedVia": null,
+      "daysSincePurchase": 14
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111102",
+      "householdId": "00000000-0000-4000-8000-000000000001",
+      "normalizedName": "대파",
+      "rawName": "흙대파 1단",
+      "quantity": "1단",
+      "purchasedAt": "2026-08-08",
+      "sourceMailConnectionId": "22222222-2222-4222-8222-222222222201",
+      "status": "in_stock",
+      "consumedAt": null,
+      "consumedVia": null,
+      "daysSincePurchase": 12
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111103",
+      "householdId": "00000000-0000-4000-8000-000000000001",
+      "normalizedName": "계란",
+      "rawName": "동물복지 유정란 대란 20구",
+      "quantity": "20구",
+      "purchasedAt": "2026-08-12",
+      "sourceMailConnectionId": "22222222-2222-4222-8222-222222222202",
+      "status": "in_stock",
+      "consumedAt": null,
+      "consumedVia": null,
+      "daysSincePurchase": 8
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111104",
+      "householdId": "00000000-0000-4000-8000-000000000001",
+      "normalizedName": "돼지고기",
+      "rawName": "국내산 냉장 삼겹살 600g",
+      "quantity": "600g",
+      "purchasedAt": "2026-08-15",
+      "sourceMailConnectionId": "22222222-2222-4222-8222-222222222201",
+      "status": "in_stock",
+      "consumedAt": null,
+      "consumedVia": null,
+      "daysSincePurchase": 5
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111105",
+      "householdId": "00000000-0000-4000-8000-000000000001",
+      "normalizedName": "우유",
+      "rawName": "서울우유 흰우유 900ml",
+      "quantity": "900ml",
+      "purchasedAt": "2026-08-17",
+      "sourceMailConnectionId": "22222222-2222-4222-8222-222222222202",
+      "status": "in_stock",
+      "consumedAt": null,
+      "consumedVia": null,
+      "daysSincePurchase": 3
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111106",
+      "householdId": "00000000-0000-4000-8000-000000000001",
+      "normalizedName": "양파",
+      "rawName": "깐양파 1.5kg",
+      "quantity": "1.5kg",
+      "purchasedAt": "2026-08-19",
+      "sourceMailConnectionId": "22222222-2222-4222-8222-222222222201",
+      "status": "in_stock",
+      "consumedAt": null,
+      "consumedVia": null,
+      "daysSincePurchase": 1
+    }
+  ]
+}
