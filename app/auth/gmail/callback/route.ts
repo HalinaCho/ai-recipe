@@ -124,35 +124,23 @@ export async function GET(request: Request) {
     return fail(origin, "config");
   }
 
-  // No unique constraint on (household_id, provider, email_address) exists
-  // yet, so re-connecting the same mailbox is an explicit update rather
-  // than an upsert — this also revives a previously expired connection.
-  const { data: existing } = await supabase
-    .from("mail_connection")
-    .select("id")
-    .eq("household_id", member.household_id)
-    .eq("provider", "gmail")
-    .eq("email_address", check.emailAddress)
-    .maybeSingle();
-
-  const { error: writeError } = existing
-    ? await supabase
-        .from("mail_connection")
-        .update({
-          encrypted_secret: encryptedSecret,
-          connected_by_member_id: member.id,
-          status: "active",
-        })
-        .eq("id", existing.id)
-    : await supabase.from("mail_connection").insert({
-        household_id: member.household_id,
-        connected_by_member_id: member.id,
-        provider: "gmail",
-        email_address: check.emailAddress,
-        auth_type: "oauth",
-        encrypted_secret: encryptedSecret,
-        status: "active",
-      });
+  // Re-connecting the same mailbox refreshes the stored credential and
+  // revives a previously expired connection. The unique constraint from
+  // migration 0004 makes this atomic — a select-then-write would race a
+  // concurrent callback and could duplicate the connection, which would
+  // then double-count every order mail into inventory.
+  const { error: writeError } = await supabase.from("mail_connection").upsert(
+    {
+      household_id: member.household_id,
+      connected_by_member_id: member.id,
+      provider: "gmail",
+      email_address: check.emailAddress,
+      auth_type: "oauth",
+      encrypted_secret: encryptedSecret,
+      status: "active",
+    },
+    { onConflict: "household_id,provider,email_address" },
+  );
 
   if (writeError) {
     return fail(origin, "save_failed");
