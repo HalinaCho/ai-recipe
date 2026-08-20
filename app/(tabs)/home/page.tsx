@@ -4,13 +4,13 @@ import Link from "next/link";
 import { TopAppBar } from "@/components/ui/TopAppBar";
 import { EatSoonSummary } from "@/components/inventory/EatSoonSummary";
 import { PreviewBadge } from "@/components/inventory/PreviewBadge";
-import { RecipeTeaserCard } from "@/components/inventory/RecipeTeaserCard";
 import { SyncPanel } from "@/components/inventory/SyncPanel";
+import { TodayRecipesSection } from "@/components/recipes/TodayRecipesSection";
 import { useSync } from "@/lib/hooks/use-sync";
 import { cn } from "@/lib/utils";
 
-// 홈 탭 — 소진임박 요약(FR-04) + 수동 동기화(FR-02-02).
-// 오늘의 추천 레시피 자리는 Phase 2에서 채운다.
+// 홈 탭 — 소진임박 요약(FR-04) + 수동 동기화(FR-02-02)
+// + 오늘의 추천 레시피(FR-09-01).
 export default function HomePage() {
   const sync = useSync();
 
@@ -64,7 +64,7 @@ export default function HomePage() {
           />
         </section>
 
-        <RecipeTeaserCard />
+        <TodayRecipesSection />
       </div>
     </div>
   );
