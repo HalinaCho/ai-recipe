@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -20,33 +21,55 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
   }
 
-  const { data: household, error: householdError } = await supabase
-    .from("household")
-    .insert({ name: body.name.trim() })
-    .select()
-    .single();
+  // household_select's RLS policy only allows members to read a household,
+  // but a user creating their first household isn't a member yet — so
+  // chaining .select() on this insert would have the RETURNING clause
+  // blocked by that same policy (chicken-and-egg). Generate the id
+  // ourselves and insert without RETURNING, then re-fetch both rows in a
+  // separate request once the member row (which grants visibility) exists.
+  const householdId = randomUUID();
 
-  if (householdError || !household) {
+  const { error: householdError } = await supabase
+    .from("household")
+    .insert({ id: householdId, name: body.name.trim() });
+
+  if (householdError) {
     return NextResponse.json(
-      { error: householdError?.message ?? "failed to create household" },
+      { error: householdError.message },
       { status: 500 },
     );
   }
 
-  const { data: member, error: memberError } = await supabase
-    .from("member")
-    .insert({
-      household_id: household.id,
-      user_id: user.id,
-      display_name: user.user_metadata?.full_name ?? user.email ?? "구성원",
-      role: "owner",
-    })
-    .select()
-    .single();
+  const { error: memberError } = await supabase.from("member").insert({
+    household_id: householdId,
+    user_id: user.id,
+    display_name: user.user_metadata?.full_name ?? user.email ?? "구성원",
+    role: "owner",
+  });
 
-  if (memberError || !member) {
+  if (memberError) {
+    return NextResponse.json({ error: memberError.message }, { status: 500 });
+  }
+
+  const [{ data: household, error: fetchHouseholdError }, { data: member, error: fetchMemberError }] =
+    await Promise.all([
+      supabase.from("household").select().eq("id", householdId).single(),
+      supabase
+        .from("member")
+        .select()
+        .eq("household_id", householdId)
+        .eq("user_id", user.id)
+        .single(),
+    ]);
+
+  if (fetchHouseholdError || !household || fetchMemberError || !member) {
     return NextResponse.json(
-      { error: memberError?.message ?? "failed to create member" },
+      {
+        error:
+          fetchHouseholdError?.message ??
+          fetchMemberError?.message ??
+          "failed to load created household",
+      },
       { status: 500 },
     );
   }
