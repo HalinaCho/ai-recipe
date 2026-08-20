@@ -1,0 +1,45 @@
+import { NextResponse } from "next/server";
+import { getHouseholdContext } from "@/lib/inventory/household-context";
+import { DEFAULT_MATCHING_CONFIG } from "@/lib/recipes/matching/config";
+import { buildRankedRecipeList } from "@/lib/recipes/matching/queries";
+import { createClient } from "@/lib/supabase/server";
+import type { RecipeListResponse } from "@/types/api";
+
+function resolveLimit(raw: string | null): number {
+  const { default: fallback, max } = DEFAULT_MATCHING_CONFIG.listLimit;
+  const parsed = Number(raw);
+  if (!raw || !Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.min(Math.floor(parsed), max);
+}
+
+/** GET /api/recipes — 온디맨드 레시피 목록, 매칭률 순 (FR-09-02). */
+export async function GET(request: Request) {
+  const supabase = await createClient();
+  const context = await getHouseholdContext(supabase);
+
+  if (!context) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const limit = resolveLimit(new URL(request.url).searchParams.get("limit"));
+
+  try {
+    const recipes = await buildRankedRecipeList(
+      supabase,
+      context.householdId,
+      limit,
+    );
+    const response: RecipeListResponse = { recipes };
+    return NextResponse.json(response);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "레시피를 불러오지 못했습니다",
+      },
+      { status: 500 },
+    );
+  }
+}
