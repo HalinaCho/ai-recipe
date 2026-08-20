@@ -12,7 +12,7 @@ import type { ParsedOrderMail, ParsedPurchaseItem } from "@/lib/parsing/types";
  * 계정 티어에 따라 쓸 수 있는 모델이 다를 수 있어 env로 갈아끼울 수 있게 뒀다
  * (모델을 못 찾으면 GEMINI_MODEL만 바꾸면 된다).
  */
-const MODEL = process.env.GEMINI_MODEL ?? "gemini-3.7-flash";
+const MODEL = process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
 
 // 스키마가 강제돼 있고 본문에서 그대로 옮겨 적는 작업이라 깊은 추론이 필요 없다.
 // 정규화 판단 정도만 남기고 최소로 둔다.
