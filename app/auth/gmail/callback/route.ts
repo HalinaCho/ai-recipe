@@ -114,6 +114,9 @@ export async function GET(request: Request) {
   }).verifyConnection();
 
   if (!check.ok || !check.emailAddress) {
+    // 사용자에게는 코드만 보내지만, 원인은 서버에 남겨야 진단이 된다
+    // (Gmail API 미활성화 등 설정 문제가 여기로 떨어진다).
+    console.error("gmail verifyConnection failed:", check.error);
     return fail(origin, "verify_failed");
   }
 
