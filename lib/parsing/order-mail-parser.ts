@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { INGREDIENT_ICON_SEED } from "@/lib/icons/ingredient-icon-map";
 import type { RawMailMessage } from "@/lib/mail-adapters/types";
 import type { ParsedOrderMail, ParsedPurchaseItem } from "@/lib/parsing/types";
@@ -7,11 +7,16 @@ import type { ParsedOrderMail, ParsedPurchaseItem } from "@/lib/parsing/types";
 // 이 한 경로를 지난다 — 템플릿이 바뀌어도 코드를 고칠 필요가 없도록.
 // FR-03-03 / NFR-02: 본문은 이 모듈 안에서만 존재하고 절대 저장되지 않는다.
 
-const MODEL = "claude-opus-5";
+/**
+ * 메일 한 통마다 호출되므로 비용·지연이 중요해 flash 계열을 쓴다.
+ * 계정 티어에 따라 쓸 수 있는 모델이 다를 수 있어 env로 갈아끼울 수 있게 뒀다
+ * (모델을 못 찾으면 GEMINI_MODEL만 바꾸면 된다).
+ */
+const MODEL = process.env.GEMINI_MODEL ?? "gemini-3.7-flash";
 
-// 주문 메일 한 통은 짧고 구조가 단순해 medium이면 충분하다. 정규화 품질이
-// 걸린 작업이라 low까지는 내리지 않는다.
-const EFFORT = "medium" as const;
+// 스키마가 강제돼 있고 본문에서 그대로 옮겨 적는 작업이라 깊은 추론이 필요 없다.
+// 정규화 판단 정도만 남기고 최소로 둔다.
+const THINKING_LEVEL = ThinkingLevel.LOW;
 
 /**
  * 본문 상한. HTML을 텍스트로 편 영수증 메일은 드물게 수십만 자가 되는데,
@@ -25,7 +30,7 @@ const KNOWN_NAMES = INGREDIENT_ICON_SEED.map((e) => e.normalizedName).join(", ")
 
 const SYSTEM_PROMPT = `당신은 한국 온라인 쇼핑몰(쿠팡, 네이버페이, 마켓컬리, SSG, 이마트, 11번가 등)의 주문 확인 메일에서 식재료 정보를 뽑아내는 추출기입니다.
 
-반드시 record_order 도구를 정확히 한 번 호출해서 결과를 돌려주세요. 도구 없이 문장으로 답하면 안 됩니다.
+지정된 JSON 스키마에 맞는 JSON만 출력하세요. 설명 문장이나 코드블록 표시를 덧붙이지 마세요.
 
 ## 구매일 (purchasedAt)
 - 본문에서 주문일/결제일을 찾아 YYYY-MM-DD로 변환합니다.
@@ -58,49 +63,42 @@ const SYSTEM_PROMPT = `당신은 한국 온라인 쇼핑몰(쿠팡, 네이버페
 
 주문 메일이 아니거나(배송 알림, 광고, 리뷰 요청 등) 식재료가 하나도 없으면 items를 빈 배열로 두고 complete를 true로 두세요.`;
 
-const TOOL_NAME = "record_order";
-
-const EXTRACTION_TOOL: Anthropic.Tool = {
-  name: TOOL_NAME,
-  description:
-    "주문 확인 메일에서 뽑아낸 구매일과 식재료 품목 목록을 기록합니다.",
-  strict: true,
-  input_schema: {
-    type: "object",
-    properties: {
-      purchasedAt: {
-        type: "string",
-        description: "주문일. YYYY-MM-DD 형식.",
-      },
+/** responseJsonSchema로 그대로 넘기는 표준 JSON Schema. */
+const RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    purchasedAt: {
+      type: "string",
+      description: "주문일. YYYY-MM-DD 형식.",
+    },
+    items: {
+      type: "array",
+      description: "식재료 품목만. 배송비·쿠폰 등 비식품 줄은 제외.",
       items: {
-        type: "array",
-        description: "식재료 품목만. 배송비·쿠폰 등 비식품 줄은 제외.",
-        items: {
-          type: "object",
-          properties: {
-            rawName: { type: "string", description: "메일에 적힌 상품명 그대로." },
-            normalizedName: {
-              type: "string",
-              description: "브랜드·용량·포장을 걷어낸 맨 재료 명사.",
-            },
-            quantity: {
-              type: "string",
-              description: "메일 표기 그대로의 수량. 예: \"2개\", \"900ml\".",
-            },
+        type: "object",
+        properties: {
+          rawName: { type: "string", description: "메일에 적힌 상품명 그대로." },
+          normalizedName: {
+            type: "string",
+            description: "브랜드·용량·포장을 걷어낸 맨 재료 명사.",
           },
-          required: ["rawName", "normalizedName", "quantity"],
-          additionalProperties: false,
+          quantity: {
+            type: "string",
+            description: '메일 표기 그대로의 수량. 예: "2개", "900ml".',
+          },
         },
-      },
-      complete: {
-        type: "boolean",
-        description: "주문서의 모든 상품 줄을 읽어냈으면 true.",
+        required: ["rawName", "normalizedName", "quantity"],
+        additionalProperties: false,
       },
     },
-    required: ["purchasedAt", "items", "complete"],
-    additionalProperties: false,
+    complete: {
+      type: "boolean",
+      description: "주문서의 모든 상품 줄을 읽어냈으면 true.",
+    },
   },
-};
+  required: ["purchasedAt", "items", "complete"],
+  additionalProperties: false,
+} as const;
 
 /** LLM이 돌려주는 도구 입력의 기대 모양. 실제 검증은 sanitizeExtraction이 한다. */
 export interface OrderExtraction {
@@ -109,11 +107,17 @@ export interface OrderExtraction {
   complete: boolean;
 }
 
-let client: Anthropic | null = null;
+let client: GoogleGenAI | null = null;
 
-function getClient(): Anthropic {
+function getClient(): GoogleGenAI {
   if (!client) {
-    client = new Anthropic();
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "GEMINI_API_KEY is not set — cannot parse order mails",
+      );
+    }
+    client = new GoogleGenAI({ apiKey });
   }
   return client;
 }
@@ -135,47 +139,46 @@ export async function parseOrderMail(
     ? mail.bodyText.slice(0, MAX_BODY_CHARS)
     : mail.bodyText;
 
-  const response = await getClient().messages.create({
+  const prompt = [
+    `보낸사람: ${mail.from}`,
+    `제목: ${mail.subject}`,
+    `메일 수신일: ${toIsoDate(mail.receivedAt)}`,
+    truncated
+      ? "주의: 본문이 길어 앞부분만 전달되었습니다. 잘린 뒷부분이 있으므로 complete는 false로 두세요."
+      : "",
+    "",
+    "--- 본문 ---",
+    body,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const response = await getClient().models.generateContent({
     model: MODEL,
-    max_tokens: 16000,
-    system: SYSTEM_PROMPT,
-    output_config: { effort: EFFORT },
-    tools: [EXTRACTION_TOOL],
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: [
-              `보낸사람: ${mail.from}`,
-              `제목: ${mail.subject}`,
-              `메일 수신일: ${toIsoDate(mail.receivedAt)}`,
-              truncated
-                ? "주의: 본문이 길어 앞부분만 전달되었습니다. 잘린 뒷부분이 있으므로 complete는 false로 두세요."
-                : "",
-              "",
-              "--- 본문 ---",
-              body,
-            ]
-              .filter(Boolean)
-              .join("\n"),
-          },
-        ],
-      },
-    ],
+    contents: prompt,
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      responseMimeType: "application/json",
+      responseJsonSchema: RESPONSE_SCHEMA,
+      thinkingConfig: { thinkingLevel: THINKING_LEVEL },
+      maxOutputTokens: 16000,
+      // 추출 작업이라 표현의 다양성이 해롭다. 같은 메일이면 같은 결과가 나오도록.
+      temperature: 0,
+    },
   });
 
-  const toolUse = response.content.find(
-    (block): block is Anthropic.ToolUseBlock =>
-      block.type === "tool_use" && block.name === TOOL_NAME,
-  );
+  const extraction = parseJsonResponse(response.text);
 
-  if (!toolUse) {
-    return { purchasedAt: toIsoDate(mail.receivedAt), items: [], status: "failed" };
+  if (extraction === null) {
+    // 스키마를 걸어도 안전차단·토큰상한 등으로 본문이 비어 올 수 있다.
+    return {
+      purchasedAt: toIsoDate(mail.receivedAt),
+      items: [],
+      status: "failed",
+    };
   }
 
-  return sanitizeExtraction(toolUse.input, mail, { truncated });
+  return sanitizeExtraction(extraction, mail, { truncated });
 }
 
 // 비식품 안전망. FR-03-02가 금지하는 건 "쇼핑몰별 템플릿 파서"이고, 이건
@@ -261,6 +264,28 @@ export function sanitizeExtraction(
     items.length === 0 ? "failed" : incomplete ? "partial" : "success";
 
   return { purchasedAt, items, status };
+}
+
+/**
+ * 응답 본문을 JSON으로 읽는다. 스키마를 걸어도 모델이 드물게 ```json 펜스를
+ * 덧붙이는 경우가 있어 한 번 벗겨내고 재시도한다.
+ */
+function parseJsonResponse(text: string | undefined): unknown {
+  if (!text) return null;
+
+  const candidates = [
+    text,
+    text.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, ""),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // 다음 후보로
+    }
+  }
+  return null;
 }
 
 function trimOrEmpty(value: unknown): string {
