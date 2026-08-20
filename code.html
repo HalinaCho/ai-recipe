@@ -1,0 +1,286 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Naeng-Pa-Go - Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#d1c794",
+                        "surface-container-highest": "#e2e3e1",
+                        "on-primary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#abcec0",
+                        "outline": "#7b776a",
+                        "secondary": "#45636e",
+                        "on-secondary-fixed-variant": "#2d4b55",
+                        "inverse-surface": "#2f3130",
+                        "on-surface": "#1a1c1b",
+                        "on-tertiary-fixed": "#002118",
+                        "surface-tint": "#665f34",
+                        "secondary-fixed-dim": "#accbd8",
+                        "surface": "#f9f9f7",
+                        "surface-dim": "#dadad8",
+                        "on-primary-fixed-variant": "#4e471f",
+                        "background": "#f9f9f7",
+                        "primary-fixed": "#eee3ad",
+                        "on-primary-container": "#776f43",
+                        "on-secondary-container": "#4b6974",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#001f28",
+                        "inverse-on-surface": "#f1f1ef",
+                        "secondary-fixed": "#c8e8f5",
+                        "inverse-primary": "#d1c794",
+                        "on-primary-fixed": "#201c00",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#c7eadc",
+                        "secondary-container": "#c8e8f5",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-container": "#557569",
+                        "surface-container-lowest": "#ffffff",
+                        "primary": "#665f34",
+                        "surface-bright": "#f9f9f7",
+                        "tertiary-container": "#d7fbec",
+                        "outline-variant": "#cbc6b7",
+                        "primary-container": "#fff4bd",
+                        "surface-container-low": "#f4f4f2",
+                        "surface-container-high": "#e8e8e6",
+                        "on-tertiary-fixed-variant": "#2d4d42",
+                        "on-surface-variant": "#4a473c",
+                        "tertiary": "#456559",
+                        "surface-container": "#eeeeec",
+                        "surface-variant": "#e2e3e1",
+                        "on-background": "#1a1c1b",
+                        "error": "#ba1a1a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "24px",
+                        "xl": "32px",
+                        "xs": "4px",
+                        "gutter": "12px",
+                        "sm": "8px",
+                        "base": "4px",
+                        "container-padding": "20px",
+                        "md": "16px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "label-md": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "700" }],
+                        "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "headline-md": ["22px", { "lineHeight": "28px", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "26px", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "800" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .tinted-shadow { box-shadow: 0 4px 20px rgba(253, 230, 138, 0.3); }
+        .tinted-shadow-hover { box-shadow: 0 8px 30px rgba(253, 230, 138, 0.4); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-24 selection:bg-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-xl shadow-[0_4px_20px_rgba(253,230,138,0.3)]">
+<div class="flex items-center justify-between px-container-padding py-md w-full max-w-md mx-auto">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-container">
+<img alt="User Profile Photo" class="w-full h-full object-cover" data-alt="A small, cheerful portrait of a young man with a friendly smile, illustrated in a clean, modern, flat vector style. The background is a soft pastel yellow. The overall look is minimal, bright, and suitable for a mobile app avatar." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjRmnfOm9UFRB-0W0t7zAxtg5Uzww7rTfX_cu5H70c2q0ffCnUCjIThn8nE6TJ5dnqdKPtJ0NM1n6-uH0J92tMo-lK1pDz1qtLojmSKO_4Xybv_NFz1DBcn_u-yPu8W6eKtRHbRZ8Be1OPsHQOMPg_xPNdSg4qbavux3piry8M0JxB6D3HT5R4FSJW9vro_Le-ADdZUvCNIFLEsS8t4cwyHSztzfSO95ATmzwuC7FulAEMgrl5vJzxyead5L6wrdFT-jJM8zFAGV1-">
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim tracking-tight">Hi Jihoon!</h1>
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Thursday, Oct 24</span>
+<span class="w-1 h-1 rounded-full bg-primary-fixed-dim"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant/70">Updated 10m ago</span>
+</div>
+</div>
+</div>
+<button aria-label="Sync Inventory" class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-lowest tinted-shadow text-primary hover:bg-primary-container/50 transition-colors active:translate-y-0.5 transition-transform duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">sync</span>
+</button>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="pt-28 px-container-padding max-w-md mx-auto flex flex-col gap-8">
+<!-- Expiring Soon Section -->
+<section>
+<div class="flex justify-between items-end mb-4">
+<h2 class="font-headline-md text-headline-md text-on-surface">Expiring Soon</h2>
+<a class="font-label-md text-label-md text-primary flex items-center hover:opacity-80" href="#">View All <span class="material-symbols-outlined text-sm ml-1">chevron_right</span></a>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory hide-scrollbar">
+<!-- Tofu -->
+<div class="snap-start flex-none w-28 h-28 bg-tertiary-container rounded-xl flex flex-col items-center justify-center gap-2 tinted-shadow">
+<span class="material-symbols-outlined text-tertiary text-3xl">set_meal</span>
+<span class="font-label-md text-label-md text-on-tertiary-container">Tofu</span>
+<span class="font-label-sm text-label-sm px-2 py-1 bg-tertiary text-on-tertiary rounded-full">D-1</span>
+</div>
+<!-- Milk -->
+<div class="snap-start flex-none w-28 h-28 bg-primary-container rounded-xl flex flex-col items-center justify-center gap-2 tinted-shadow">
+<span class="material-symbols-outlined text-primary text-3xl">water_bottle</span>
+<span class="font-label-md text-label-md text-on-primary-container">Milk</span>
+<span class="font-label-sm text-label-sm px-2 py-1 bg-primary text-on-primary rounded-full">D-2</span>
+</div>
+<!-- Spinach -->
+<div class="snap-start flex-none w-28 h-28 bg-secondary-container rounded-xl flex flex-col items-center justify-center gap-2 tinted-shadow">
+<span class="material-symbols-outlined text-secondary text-3xl">eco</span>
+<span class="font-label-md text-label-md text-on-secondary-container">Spinach</span>
+<span class="font-label-sm text-label-sm px-2 py-1 bg-secondary text-on-secondary rounded-full">D-2</span>
+</div>
+</div>
+</section>
+<!-- Today's Picks Section -->
+<section>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-4">Today's Picks</h2>
+<div class="flex flex-col gap-4">
+<!-- Primary Recipe Card -->
+<div class="bg-surface-container-lowest rounded-xl p-3 tinted-shadow relative overflow-hidden group hover:tinted-shadow-hover transition-shadow">
+<div class="h-48 rounded-lg overflow-hidden mb-3 relative">
+<img alt="Tomato Egg Stir-fry" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A top-down view of a steaming plate of vibrant red tomato and fluffy yellow egg stir-fry, garnished with fresh green scallions. The dish sits on a clean, white ceramic plate atop a light wood dining table. The lighting is bright and natural, casting soft shadows, creating an appetizing, warm, and comforting culinary scene suitable for a food app." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCiOI4fZMCcWh06spR-a1HHh6kVwup594q2BKU_kv-tehwkFQ9idpMC90OE8llDrw6-N--mrR-MdssvDFuC2r6SoWVcqVLYGIeflXBAKhALVZBCdMDtnYRdzKstEwmGpQsos9V6CojCohtih4NxDlQTAGSsk-DXLVirt1lYE54BUDymlX4cJXer_aJRRL9LI6MDT313BBi5c2AqHvL9xIxjQdPGjfwhS_o-Nalvx6VmGjpXxtY2fmmyYYbz3bsctIWT_qY_pouQzoxg">
+<div class="absolute top-2 right-2 bg-surface/90 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span class="font-label-sm text-label-sm text-primary">95% Match</span>
+</div>
+</div>
+<div class="px-2">
+<h3 class="font-body-lg text-body-lg text-on-surface mb-1">Tomato Egg Stir-fry</h3>
+<div class="flex items-center text-tertiary">
+<span class="material-symbols-outlined text-sm mr-1">check_circle</span>
+<span class="font-label-sm text-label-sm">0 Missing Ingredients</span>
+</div>
+</div>
+</div>
+<!-- Secondary Recipe Card -->
+<div class="bg-surface-container-lowest rounded-xl p-3 flex gap-4 tinted-shadow items-center active:translate-y-0.5 transition-transform">
+<div class="w-20 h-20 rounded-lg overflow-hidden shrink-0">
+<img alt="Spinach Frittata" class="w-full h-full object-cover" data-alt="A close-up shot of a slice of spinach frittata, showcasing layers of bright green spinach and yellow egg. It is presented on a minimalist pastel blue plate. The lighting is soft and cheerful, highlighting the texture of the baked egg. The overall aesthetic is clean, modern, and appetizing." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCLl-kHGPRXUy_BpO0XVnuVM6ZxOrom43Paqo3C7YeMJWCt2dKhBhwbV9Q4Q-IgeR9athUEdFRcQm-kVABTl9K_23iF4lCSHxkVyOKTtx6y2vttYXSmEcTgdkfHZTJsEIro0hmYgoTXDGhI9Bz6bRVOU8KPw2O1tecGv9GRFGFXdmIdGVPAse6dmCG6PJwfPbcpOjKJIaAZzTNqlJY1xzZxQ8SEagyVbMtkhQWaeA4RYS4slMxg_H4CBaeklNlk6aAmAvKqBNoYC5hV">
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-body-md text-body-md text-on-surface">Spinach Frittata</h3>
+<span class="font-label-sm text-label-sm text-secondary bg-secondary-container px-2 py-0.5 rounded-full">82%</span>
+</div>
+<div class="flex items-start text-error">
+<span class="material-symbols-outlined text-sm mr-1 mt-0.5">error</span>
+<span class="font-label-sm text-label-sm">Missing: Cheddar Cheese</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Weekly Meal Plan Widget -->
+<section class="mb-8">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-4">Weekly Meal Plan</h2>
+<div class="bg-surface-container-lowest rounded-xl p-4 tinted-shadow">
+<!-- Days Row -->
+<div class="flex justify-between items-center mb-5">
+<div class="flex flex-col items-center gap-1 opacity-50">
+<span class="font-label-sm text-label-sm">M</span>
+<span class="w-8 h-8 flex items-center justify-center font-label-md text-label-md rounded-full">21</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-50">
+<span class="font-label-sm text-label-sm">T</span>
+<span class="w-8 h-8 flex items-center justify-center font-label-md text-label-md rounded-full">22</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-50">
+<span class="font-label-sm text-label-sm">W</span>
+<span class="w-8 h-8 flex items-center justify-center font-label-md text-label-md rounded-full">23</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-primary">
+<span class="font-label-sm text-label-sm font-bold">T</span>
+<span class="w-9 h-9 flex items-center justify-center font-label-md text-label-md rounded-full bg-primary-container text-on-primary-container shadow-sm">24</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-50">
+<span class="font-label-sm text-label-sm">F</span>
+<span class="w-8 h-8 flex items-center justify-center font-label-md text-label-md rounded-full">25</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-50">
+<span class="font-label-sm text-label-sm">S</span>
+<span class="w-8 h-8 flex items-center justify-center font-label-md text-label-md rounded-full">26</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-50">
+<span class="font-label-sm text-label-sm">S</span>
+<span class="w-8 h-8 flex items-center justify-center font-label-md text-label-md rounded-full">27</span>
+</div>
+</div>
+<!-- Tonight's Menu -->
+<div class="bg-surface rounded-lg p-3 border border-outline-variant/30 flex justify-between items-center">
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant block mb-1">Tonight's Menu</span>
+<span class="font-body-md text-body-md text-on-surface font-semibold">Tomato Egg Stir-fry</span>
+</div>
+<button class="w-8 h-8 flex items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 rounded-t-xl bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-xl shadow-[0_-4px_20px_rgba(253,230,138,0.3)] md:hidden">
+<div class="max-w-md mx-auto w-full flex justify-around items-center px-4 pb-6 pt-2">
+<!-- Active: Home -->
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-5 py-1.5 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-md text-label-sm">Home</span>
+</button>
+<!-- Inactive: Inventory -->
+<button class="flex flex-col items-center justify-center text-on-secondary-fixed-variant opacity-70 hover:bg-primary-fixed/30 transition-all rounded-full px-4 py-1.5 active:scale-95 duration-150">
+<span class="material-symbols-outlined mb-1">kitchen</span>
+<span class="font-label-md text-label-sm">Inventory</span>
+</button>
+<!-- Inactive: Recipes -->
+<button class="flex flex-col items-center justify-center text-on-secondary-fixed-variant opacity-70 hover:bg-primary-fixed/30 transition-all rounded-full px-4 py-1.5 active:scale-95 duration-150">
+<span class="material-symbols-outlined mb-1">receipt_long</span>
+<span class="font-label-md text-label-sm">Recipes</span>
+</button>
+<!-- Inactive: Meal Plan -->
+<button class="flex flex-col items-center justify-center text-on-secondary-fixed-variant opacity-70 hover:bg-primary-fixed/30 transition-all rounded-full px-4 py-1.5 active:scale-95 duration-150">
+<span class="material-symbols-outlined mb-1">calendar_today</span>
+<span class="font-label-md text-label-sm text-center">Meal Plan</span>
+</button>
+</div>
+</nav>
+<style>
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</body></html>

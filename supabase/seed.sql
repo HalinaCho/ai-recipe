@@ -1,0 +1,36 @@
+-- Seeds ingredient_icon_map with the same first-pass data as
+-- lib/icons/ingredient-icon-map.ts (§4.2 / FR-19). Keep these two in sync.
+
+insert into ingredient_icon_map (normalized_name, visual_type, asset_ref, category) values
+  ('우유', 'emoji', '🥛', 'dairy'),
+  ('계란', 'emoji', '🥚', 'dairy'),
+  ('치즈', 'emoji', '🧀', 'dairy'),
+  ('요거트', 'emoji', '🥛', 'dairy'),
+  ('양파', 'emoji', '🧅', 'vegetable'),
+  ('마늘', 'emoji', '🧄', 'vegetable'),
+  ('당근', 'emoji', '🥕', 'vegetable'),
+  ('감자', 'emoji', '🥔', 'vegetable'),
+  ('고구마', 'emoji', '🍠', 'vegetable'),
+  ('대파', 'emoji', '🌱', 'vegetable'),
+  ('브로콜리', 'emoji', '🥦', 'vegetable'),
+  ('토마토', 'emoji', '🍅', 'vegetable'),
+  ('오이', 'emoji', '🥒', 'vegetable'),
+  ('버섯', 'emoji', '🍄', 'vegetable'),
+  ('고추', 'emoji', '🌶️', 'vegetable'),
+  ('배추', 'emoji', '🥬', 'vegetable'),
+  ('소고기', 'emoji', '🥩', 'meat'),
+  ('돼지고기', 'emoji', '🥩', 'meat'),
+  ('닭고기', 'emoji', '🍗', 'meat'),
+  ('베이컨', 'emoji', '🥓', 'meat'),
+  ('새우', 'emoji', '🦐', 'seafood'),
+  ('오징어', 'emoji', '🦑', 'seafood'),
+  ('고등어', 'emoji', '🐟', 'seafood'),
+  ('쌀', 'emoji', '🍚', 'grain'),
+  ('빵', 'emoji', '🍞', 'grain'),
+  ('국수', 'emoji', '🍜', 'grain'),
+  ('두부', 'category_fallback', 'grain', 'grain'),
+  ('김치', 'category_fallback', 'vegetable', 'vegetable'),
+  ('어묵', 'category_fallback', 'seafood', 'seafood'),
+  ('미역', 'category_fallback', 'seafood', 'seafood'),
+  ('콩나물', 'category_fallback', 'vegetable', 'vegetable')
+on conflict (normalized_name) do nothing;
