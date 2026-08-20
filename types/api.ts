@@ -114,3 +114,102 @@ export interface ShoppingSenderDomainsResponse {
 export interface AddShoppingSenderDomainRequest {
   domain: string;
 }
+
+// ---------------------------------------------------------------------------
+// M2 — recipes
+// ---------------------------------------------------------------------------
+
+/** 매칭 계산 결과. 화면이 "부족 재료"와 매칭률을 그대로 보여준다. */
+export interface RecipeMatch {
+  /** 0~1. FR-08-01 공식의 결과. */
+  score: number;
+  /** 보유 주재료 / 필요 주재료 (조미료 제외). 0~1. */
+  matchRate: number;
+  /** 재고에 있는 주재료. */
+  ownedMainIngredients: string[];
+  /** 없는 주재료 — 장보기 후보이자 상세 화면의 "부족 재료" (FR-08-02). */
+  missingMainIngredients: string[];
+  /**
+   * 이 레시피가 쓰는 소진임박(오래된) 재료. FR-08-01의 두 번째 항이며,
+   * "이거 먼저 드세요" 문구의 근거가 된다.
+   */
+  usesExpiringIngredients: string[];
+}
+
+/** 레시피 목록의 한 칸 (FR-09-02, 매칭률순 정렬). */
+export interface RecipeListItem {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  calories: number | null;
+  match: RecipeMatch;
+  /**
+   * FR-10-01: 매칭률이 애매한 구간이면 "밀키트로 간편하게" CTA를 노출한다.
+   * 구간 판단은 서버가 하고 화면은 결과만 쓴다.
+   */
+  showMealKitCta: boolean;
+}
+
+export interface RecipeListResponse {
+  recipes: RecipeListItem[];
+}
+
+/** GET /api/recipes/today — 하루 단위로 고정되는 오늘의 추천 (FR-09-01). */
+export interface TodayRecipesResponse {
+  date: string;
+  recipes: RecipeListItem[];
+}
+
+export interface RecipeIngredientDetail {
+  normalizedName: string;
+  role: "main" | "seasoning";
+  isWhitelistedSeasoning: boolean;
+  /** 재고에 있는지 — 상세 화면의 체크 표시. */
+  inStock: boolean;
+}
+
+/** GET /api/recipes/[id] */
+export interface RecipeDetailResponse {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  instructions: string[];
+  nutrition: {
+    calories: number | null;
+    carbohydrate: number | null;
+    protein: number | null;
+    fat: number | null;
+    sodium: number | null;
+  };
+  ingredients: RecipeIngredientDetail[];
+  match: RecipeMatch;
+  showMealKitCta: boolean;
+}
+
+/**
+ * POST /api/recipes/[id]/cook — "요리함" 처리 (FR-05-01).
+ * 체크리스트에서 사용자가 실제로 쓴 재료만 골라 보낸다. 기본값은 전부 체크지만
+ * 최종 판단은 사용자 것이므로, 서버는 받은 목록만 소진 처리한다.
+ */
+export interface CookRecipeRequest {
+  /** 소진 처리할 inventory_item id 목록. */
+  consumedInventoryItemIds: string[];
+}
+
+export interface CookRecipeResponse {
+  consumedCount: number;
+}
+
+/** 요리함 체크리스트에 뿌릴 후보 — 이 레시피가 쓰는, 재고에 있는 항목. */
+export interface CookChecklistItem {
+  inventoryItemId: string;
+  normalizedName: string;
+  rawName: string;
+  quantity: string;
+  daysSincePurchase: number;
+}
+
+/** GET /api/recipes/[id]/cook — 체크리스트 조회. */
+export interface CookChecklistResponse {
+  items: CookChecklistItem[];
+}

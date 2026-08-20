@@ -1,0 +1,118 @@
+{
+  "_comment": "M2 kickoff fixture. Lets the screens track build the 레시피 tab and the home 오늘의 추천 card against realistic data before the matching backend lands. Shape matches RecipeListResponse in types/api.ts; the detail object matches RecipeDetailResponse. Ordered by score descending, as the server returns it. Ingredient names follow the same normalization convention as the mail parser so matching keys line up.",
+  "recipes": [
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000001",
+      "name": "돼지고기 김치찌개",
+      "imageUrl": null,
+      "calories": 420,
+      "showMealKitCta": false,
+      "match": {
+        "score": 0.92,
+        "matchRate": 1,
+        "ownedMainIngredients": ["돼지고기", "김치", "두부", "대파"],
+        "missingMainIngredients": [],
+        "usesExpiringIngredients": ["두부", "대파"]
+      }
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000002",
+      "name": "계란말이",
+      "imageUrl": null,
+      "calories": 210,
+      "showMealKitCta": false,
+      "match": {
+        "score": 0.78,
+        "matchRate": 1,
+        "ownedMainIngredients": ["계란", "대파", "당근"],
+        "missingMainIngredients": [],
+        "usesExpiringIngredients": ["대파"]
+      }
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000003",
+      "name": "연어 스테이크",
+      "imageUrl": null,
+      "calories": 380,
+      "showMealKitCta": true,
+      "match": {
+        "score": 0.55,
+        "matchRate": 0.5,
+        "ownedMainIngredients": ["연어", "상추"],
+        "missingMainIngredients": ["레몬", "아스파라거스"],
+        "usesExpiringIngredients": ["연어"]
+      }
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000004",
+      "name": "소고기 미역국",
+      "imageUrl": null,
+      "calories": 190,
+      "showMealKitCta": true,
+      "match": {
+        "score": 0.41,
+        "matchRate": 0.5,
+        "ownedMainIngredients": ["미역"],
+        "missingMainIngredients": ["소고기"],
+        "usesExpiringIngredients": []
+      }
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000005",
+      "name": "토마토 파스타",
+      "imageUrl": null,
+      "calories": 510,
+      "showMealKitCta": false,
+      "match": {
+        "score": 0.18,
+        "matchRate": 0.25,
+        "ownedMainIngredients": ["양파"],
+        "missingMainIngredients": ["토마토", "스파게티면", "베이컨"],
+        "usesExpiringIngredients": []
+      }
+    }
+  ],
+  "detail": {
+    "id": "aaaaaaaa-0000-4000-8000-000000000001",
+    "name": "돼지고기 김치찌개",
+    "imageUrl": null,
+    "instructions": [
+      "돼지고기를 한입 크기로 썰어 냄비에 넣고 중불에서 볶는다.",
+      "고기 겉면이 익으면 잘 익은 김치를 넣고 함께 볶는다.",
+      "물을 붓고 센 불에서 끓인다.",
+      "두부를 도톰하게 썰어 넣고 5분 더 끓인다.",
+      "대파를 어슷 썰어 올리고 한소끔 끓여 마무리한다."
+    ],
+    "nutrition": {
+      "calories": 420,
+      "carbohydrate": 18,
+      "protein": 26,
+      "fat": 25,
+      "sodium": 1200
+    },
+    "ingredients": [
+      { "normalizedName": "돼지고기", "role": "main", "isWhitelistedSeasoning": false, "inStock": true },
+      { "normalizedName": "김치", "role": "main", "isWhitelistedSeasoning": false, "inStock": true },
+      { "normalizedName": "두부", "role": "main", "isWhitelistedSeasoning": false, "inStock": true },
+      { "normalizedName": "대파", "role": "main", "isWhitelistedSeasoning": false, "inStock": true },
+      { "normalizedName": "고춧가루", "role": "seasoning", "isWhitelistedSeasoning": true, "inStock": false },
+      { "normalizedName": "다진마늘", "role": "seasoning", "isWhitelistedSeasoning": true, "inStock": false },
+      { "normalizedName": "국간장", "role": "seasoning", "isWhitelistedSeasoning": true, "inStock": false }
+    ],
+    "match": {
+      "score": 0.92,
+      "matchRate": 1,
+      "ownedMainIngredients": ["돼지고기", "김치", "두부", "대파"],
+      "missingMainIngredients": [],
+      "usesExpiringIngredients": ["두부", "대파"]
+    },
+    "showMealKitCta": false
+  },
+  "cookChecklist": {
+    "items": [
+      { "inventoryItemId": "11111111-1111-4111-8111-111111111104", "normalizedName": "돼지고기", "rawName": "국내산 냉장 삼겹살 600g", "quantity": "600g", "daysSincePurchase": 5 },
+      { "inventoryItemId": "11111111-1111-4111-8111-111111111101", "normalizedName": "두부", "rawName": "풀무원 국산콩 부침두부 300g", "quantity": "1모", "daysSincePurchase": 14 },
+      { "inventoryItemId": "11111111-1111-4111-8111-111111111102", "normalizedName": "대파", "rawName": "흙대파 1단", "quantity": "1단", "daysSincePurchase": 12 }
+    ]
+  }
+}

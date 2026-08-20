@@ -209,6 +209,30 @@ export interface Database {
         >;
         Relationships: [];
       };
+      daily_recommendation: {
+        Row: {
+          id: string;
+          household_id: string;
+          date: string;
+          recipe_id: string;
+          rank: number;
+          match_score: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          date: string;
+          recipe_id: string;
+          rank: number;
+          match_score?: number | null;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["daily_recommendation"]["Insert"]
+        >;
+        Relationships: [];
+      };
       weekly_meal_plan: {
         Row: {
           id: string;
