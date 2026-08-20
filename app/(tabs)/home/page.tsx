@@ -1,36 +1,70 @@
-import { TopAppBar } from "@/components/ui/TopAppBar";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+"use client";
 
-// M0 shell — 소진임박 요약(M1)과 오늘의 추천 레시피(M2)는 이후 단계에서 채운다.
+import Link from "next/link";
+import { TopAppBar } from "@/components/ui/TopAppBar";
+import { EatSoonSummary } from "@/components/inventory/EatSoonSummary";
+import { PreviewBadge } from "@/components/inventory/PreviewBadge";
+import { RecipeTeaserCard } from "@/components/inventory/RecipeTeaserCard";
+import { SyncPanel } from "@/components/inventory/SyncPanel";
+import { useSync } from "@/lib/hooks/use-sync";
+import { cn } from "@/lib/utils";
+
+// 홈 탭 — 소진임박 요약(FR-04) + 수동 동기화(FR-02-02).
+// 오늘의 추천 레시피 자리는 Phase 2에서 채운다.
 export default function HomePage() {
+  const sync = useSync();
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mx-auto flex max-w-md flex-col gap-6">
       <TopAppBar
         title="냉파고"
         action={
-          <Button variant="ghost" className="px-3 min-h-10">
-            <span className="material-symbols-outlined text-xl">sync</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="메일 동기화"
+              onClick={() => sync.mutate()}
+              disabled={sync.isPending}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest text-primary shadow-tinted transition-all active:scale-95 active:translate-y-0.5 disabled:opacity-60"
+            >
+              <span
+                className={cn(
+                  "material-symbols-outlined text-2xl",
+                  sync.isPending && "animate-spin",
+                )}
+              >
+                sync
+              </span>
+            </button>
+            <Link
+              href="/settings"
+              aria-label="설정"
+              className="flex h-12 w-12 items-center justify-center rounded-full text-on-surface-variant transition-all active:scale-95"
+            >
+              <span className="material-symbols-outlined text-2xl">
+                settings
+              </span>
+            </Link>
+          </div>
         }
       />
-      <div className="px-container-padding flex flex-col gap-4">
-        <Card>
-          <p className="text-label-md text-on-surface-variant mb-1">
-            소진임박 재료
-          </p>
-          <p className="text-body-md text-on-surface-variant">
-            메일 연동이 완료되면 여기에 표시돼요.
-          </p>
-        </Card>
-        <Card>
-          <p className="text-label-md text-on-surface-variant mb-1">
-            오늘의 추천 레시피
-          </p>
-          <p className="text-body-md text-on-surface-variant">
-            재고가 쌓이면 매칭률 높은 레시피를 추천해드려요.
-          </p>
-        </Card>
+
+      <div className="flex flex-col gap-8 px-container-padding pb-4">
+        <PreviewBadge />
+
+        <EatSoonSummary />
+
+        <section className="flex flex-col gap-3">
+          <h2 className="text-headline-md text-on-surface">메일 동기화</h2>
+          <SyncPanel
+            isPending={sync.isPending}
+            result={sync.data}
+            error={sync.error}
+            onSync={() => sync.mutate()}
+          />
+        </section>
+
+        <RecipeTeaserCard />
       </div>
     </div>
   );
