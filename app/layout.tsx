@@ -26,11 +26,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={plusJakartaSans.variable}>
-      {/* eslint-disable-next-line @next/next/no-page-custom-font -- root
-          layout applies to every route, so the "single page" rule doesn't
-          apply; Material Symbols isn't in next/font/google's catalog. */}
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font -- root
+            layout applies to every route, so the "single page" rule doesn't
+            apply; Material Symbols isn't in next/font/google's catalog. */}
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
