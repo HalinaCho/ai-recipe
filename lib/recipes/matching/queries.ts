@@ -1,0 +1,425 @@
+// 매칭에 필요한 DB 접근을 한곳에 모은다. 점수 공식 자체는 score.ts에 있고
+// 여기서는 "무엇을 읽어서 넣을지"만 정한다.
+
+import { listInStockItems } from "@/lib/inventory/queries";
+import type { ServerSupabaseClient } from "@/lib/inventory/types";
+import {
+  DEFAULT_MATCHING_CONFIG,
+  type MatchingConfig,
+} from "@/lib/recipes/matching/config";
+import {
+  mainIngredientNames,
+  rankRecipes,
+  scoreRecipe,
+  selectExpiringNames,
+  toListItem,
+  type ScorableRecipe,
+} from "@/lib/recipes/matching/score";
+import type {
+  CookChecklistItem,
+  RecipeListItem,
+  RecipeMatch,
+} from "@/types/api";
+import type { Database } from "@/types/database";
+
+type RecipeRow = Database["public"]["Tables"]["recipe"]["Row"];
+type RecipeIngredientRow =
+  Database["public"]["Tables"]["recipe_ingredient"]["Row"];
+
+/** PostgREST 기본 응답 상한. 이보다 큰 결과는 range로 나눠 받아야 한다. */
+const PAGE_SIZE = 1000;
+
+interface PageResult<T> {
+  data: T[] | null;
+  error: { message: string } | null;
+}
+
+/**
+ * 레시피는 1천 건대, 재료 행은 그 열 배쯤이라 한 번의 select로는 잘린다.
+ * 잘린 걸 모르고 쓰면 "재료가 없는 레시피"가 대량으로 생겨 매칭이 조용히
+ * 틀어지므로, 짧은 페이지가 나올 때까지 이어 받는다.
+ */
+async function fetchAllPages<T>(
+  runPage: (from: number, to: number) => PromiseLike<PageResult<T>>,
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await runPage(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) return all;
+  }
+}
+
+export interface HouseholdMatchContext {
+  /** FIFO 정렬된 재고 (FR-04-02). */
+  items: Awaited<ReturnType<typeof listInStockItems>>;
+  ownedNames: Set<string>;
+  expiringNames: Set<string>;
+}
+
+/**
+ * 매칭 한 번에 필요한 가구 쪽 입력. 재고 조회는 재고 탭과 같은 함수를 쓴다 —
+ * 정렬 규칙이 갈라지면 "소진임박"의 정의가 화면마다 달라진다.
+ */
+export async function loadHouseholdMatchContext(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
+): Promise<HouseholdMatchContext> {
+  const items = await listInStockItems(supabase, householdId);
+  return {
+    items,
+    ownedNames: new Set(items.map((item) => item.normalizedName)),
+    expiringNames: selectExpiringNames(items, config),
+  };
+}
+
+function toScorable(
+  recipe: RecipeRow,
+  ingredients: RecipeIngredientRow[],
+): ScorableRecipe {
+  return {
+    id: recipe.id,
+    name: recipe.name,
+    imageUrl: recipe.image_url,
+    calories: recipe.calories,
+    ingredients: ingredients.map((row) => ({
+      normalizedName: row.normalized_name,
+      role: row.role,
+      isWhitelistedSeasoning: row.is_whitelisted_seasoning,
+    })),
+  };
+}
+
+async function fetchIngredientsByRecipe(
+  supabase: ServerSupabaseClient,
+  recipeIds: string[],
+): Promise<Map<string, RecipeIngredientRow[]>> {
+  const byRecipe = new Map<string, RecipeIngredientRow[]>();
+  if (recipeIds.length === 0) return byRecipe;
+
+  const rows = await fetchAllPages<RecipeIngredientRow>((from, to) =>
+    supabase
+      .from("recipe_ingredient")
+      .select()
+      .in("recipe_id", recipeIds)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+
+  for (const row of rows) {
+    const bucket = byRecipe.get(row.recipe_id);
+    if (bucket) bucket.push(row);
+    else byRecipe.set(row.recipe_id, [row]);
+  }
+  return byRecipe;
+}
+
+/** 주어진 id들의 레시피를 재료까지 붙여서 읽는다. 없는 id는 조용히 빠진다. */
+export async function fetchScorableRecipes(
+  supabase: ServerSupabaseClient,
+  recipeIds: string[],
+): Promise<ScorableRecipe[]> {
+  if (recipeIds.length === 0) return [];
+
+  const recipes = await fetchAllPages<RecipeRow>((from, to) =>
+    supabase
+      .from("recipe")
+      .select()
+      .in("id", recipeIds)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+
+  const ingredients = await fetchIngredientsByRecipe(
+    supabase,
+    recipes.map((recipe) => recipe.id),
+  );
+
+  return recipes.map((recipe) =>
+    toScorable(recipe, ingredients.get(recipe.id) ?? []),
+  );
+}
+
+/**
+ * 재고 재료를 하나라도 쓰는 레시피 id. 전체 레시피를 매번 점수 계산하는 대신
+ * 후보를 좁힌다 — 겹치는 재료가 없으면 어차피 0점이고, 0점끼리는 순서를
+ * 이름으로 가를 뿐이라 목록 품질에 기여하지 않는다.
+ */
+async function fetchCandidateRecipeIds(
+  supabase: ServerSupabaseClient,
+  ownedNames: Set<string>,
+): Promise<string[]> {
+  if (ownedNames.size === 0) return [];
+
+  const rows = await fetchAllPages<Pick<RecipeIngredientRow, "recipe_id">>(
+    (from, to) =>
+      supabase
+        .from("recipe_ingredient")
+        .select("recipe_id")
+        .eq("role", "main")
+        .in("normalized_name", [...ownedNames])
+        .order("recipe_id", { ascending: true })
+        .range(from, to),
+  );
+
+  return [...new Set(rows.map((row) => row.recipe_id))];
+}
+
+/** 재고가 아예 없는 가구용 폴백 — 목록 탭이 통째로 비지 않게 앞에서 몇 개. */
+async function fetchRecipeSample(
+  supabase: ServerSupabaseClient,
+  limit: number,
+): Promise<ScorableRecipe[]> {
+  const { data, error } = await supabase
+    .from("recipe")
+    .select()
+    .order("name", { ascending: true })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  const recipes = data ?? [];
+
+  const ingredients = await fetchIngredientsByRecipe(
+    supabase,
+    recipes.map((recipe) => recipe.id),
+  );
+  return recipes.map((recipe) =>
+    toScorable(recipe, ingredients.get(recipe.id) ?? []),
+  );
+}
+
+/**
+ * FR-09-02: 온디맨드 레시피 목록. 매칭률 순으로 정렬해 앞에서 limit개.
+ * 부분 매칭도 그대로 포함한다 (FR-08-02).
+ */
+export async function buildRankedRecipeList(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  limit: number,
+  config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
+): Promise<RecipeListItem[]> {
+  const context = await loadHouseholdMatchContext(supabase, householdId, config);
+  const candidateIds = await fetchCandidateRecipeIds(
+    supabase,
+    context.ownedNames,
+  );
+
+  const recipes =
+    candidateIds.length > 0
+      ? await fetchScorableRecipes(supabase, candidateIds)
+      : await fetchRecipeSample(supabase, limit);
+
+  return rankRecipes(
+    recipes,
+    context.ownedNames,
+    context.expiringNames,
+    config,
+  ).slice(0, limit);
+}
+
+// ---------------------------------------------------------------------------
+// FR-09-01 — 오늘의 추천 (하루 고정)
+// ---------------------------------------------------------------------------
+
+/**
+ * 그날의 추천을 읽거나, 없으면 뽑아서 저장한 뒤 읽는다.
+ *
+ * 고정되는 것은 **어떤 레시피를 몇 번째로 보여줄지**까지다. 매칭 정보(부족
+ * 재료, 매칭률)는 응답할 때마다 현재 재고로 다시 계산한다 — 아침에 뽑힌
+ * 추천을 저녁에 열었을 때 이미 요리해서 없어진 재료를 "보유"라고 우기면
+ * 상세 화면·요리함 체크리스트와 어긋나기 때문이다. 뽑을 당시 점수는
+ * daily_recommendation.match_score에 남겨 나중에 추천 품질을 되짚는 데 쓴다.
+ */
+export async function getOrCreateTodayRecipes(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  date: string,
+  config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
+): Promise<RecipeListItem[]> {
+  const context = await loadHouseholdMatchContext(supabase, householdId, config);
+
+  let picks = await readTodayPicks(supabase, householdId, date);
+
+  if (picks.length === 0) {
+    const candidateIds = await fetchCandidateRecipeIds(
+      supabase,
+      context.ownedNames,
+    );
+    const ranked = rankRecipes(
+      await fetchScorableRecipes(supabase, candidateIds),
+      context.ownedNames,
+      context.expiringNames,
+      config,
+    )
+      // 겹치는 재료가 하나도 없는 레시피를 "오늘의 추천"으로 내밀 이유는 없다.
+      // 후보가 없으면 그냥 빈 목록이고, 화면은 재고를 채우라고 안내한다.
+      .filter((item) => item.match.score > 0)
+      .slice(0, config.todayRecipeCount);
+
+    if (ranked.length === 0) return [];
+
+    const { error } = await supabase.from("daily_recommendation").upsert(
+      ranked.map((item, index) => ({
+        household_id: householdId,
+        date,
+        recipe_id: item.id,
+        rank: index,
+        match_score: item.match.score,
+      })),
+      { onConflict: "household_id,date,recipe_id", ignoreDuplicates: true },
+    );
+    if (error) throw new Error(error.message);
+
+    // 저장한 걸 다시 읽는다. 같은 순간에 들어온 두 요청이 서로 다른 집합을
+    // 뽑았더라도, 응답은 결국 테이블에 남은 것 하나로 수렴한다.
+    picks = await readTodayPicks(supabase, householdId, date);
+  }
+
+  const recipes = await fetchScorableRecipes(supabase, picks);
+  const byId = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+
+  return picks.flatMap((recipeId) => {
+    const recipe = byId.get(recipeId);
+    if (!recipe) return []; // 그 사이 레시피가 지워진 경우
+    const match = scoreRecipe(
+      recipe,
+      context.ownedNames,
+      context.expiringNames,
+      config,
+    );
+    return [toListItem(recipe, match, config)];
+  });
+}
+
+async function readTodayPicks(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  date: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("daily_recommendation")
+    .select("recipe_id, rank")
+    .eq("household_id", householdId)
+    .eq("date", date)
+    .order("rank", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return [...new Set((data ?? []).map((row) => row.recipe_id))];
+}
+
+// ---------------------------------------------------------------------------
+// FR-05-01 — 요리함 체크리스트
+// ---------------------------------------------------------------------------
+
+export interface RecipeMatchDetail {
+  /** 영양 정보·조리 순서까지 필요한 상세 화면용 원본 행. */
+  row: RecipeRow;
+  /** 재료 원본 행 — 상세 화면이 조미료까지 전부 보여준다. */
+  ingredientRows: RecipeIngredientRow[];
+  recipe: ScorableRecipe;
+  match: RecipeMatch;
+  context: HouseholdMatchContext;
+}
+
+/** 상세 화면과 요리함이 같은 계산을 두 번 하지 않도록 한 번에 만든다. */
+export async function loadRecipeMatch(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  recipeId: string,
+  config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
+): Promise<RecipeMatchDetail | null> {
+  const context = await loadHouseholdMatchContext(supabase, householdId, config);
+
+  const { data: row, error } = await supabase
+    .from("recipe")
+    .select()
+    .eq("id", recipeId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!row) return null;
+
+  const ingredientRows =
+    (await fetchIngredientsByRecipe(supabase, [row.id])).get(row.id) ?? [];
+  const recipe = toScorable(row, ingredientRows);
+
+  return {
+    row,
+    ingredientRows,
+    recipe,
+    match: scoreRecipe(
+      recipe,
+      context.ownedNames,
+      context.expiringNames,
+      config,
+    ),
+    context,
+  };
+}
+
+/**
+ * 이 레시피의 주재료에 걸리는, 재고에 있는 항목들.
+ *
+ * 같은 재료를 여러 번 샀으면 FIFO상 가장 오래된 한 행만 올린다. 한 끼 요리로
+ * 우유 세 팩이 한꺼번에 사라지면 안 되고, 없앨 게 더 있으면 재고 탭에서
+ * 직접 지우는 길이 이미 있다 (FR-05-02).
+ */
+export async function buildCookChecklist(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  recipeId: string,
+  config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
+): Promise<CookChecklistItem[] | null> {
+  const detail = await loadRecipeMatch(supabase, householdId, recipeId, config);
+  if (!detail) return null;
+
+  const mainNames = new Set(mainIngredientNames(detail.recipe));
+  const used = new Set<string>();
+  const checklist: CookChecklistItem[] = [];
+
+  for (const item of detail.context.items) {
+    if (!mainNames.has(item.normalizedName)) continue;
+    if (used.has(item.normalizedName)) continue;
+    used.add(item.normalizedName);
+    checklist.push({
+      inventoryItemId: item.id,
+      normalizedName: item.normalizedName,
+      rawName: item.rawName,
+      quantity: item.quantity,
+      daysSincePurchase: item.daysSincePurchase,
+    });
+  }
+
+  return checklist;
+}
+
+/**
+ * FR-05-01/FR-05-03: 받은 id만 소진 처리한다. 수량 차감은 없다.
+ * household_id 조건을 직접 건다 — RLS가 이미 막지만, 남의 재고 id가 섞여
+ * 들어왔을 때 "조용히 통과"가 아니라 "0건 처리"가 되어야 한다.
+ */
+export async function consumeItemsForRecipe(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  inventoryItemIds: string[],
+): Promise<number> {
+  if (inventoryItemIds.length === 0) return 0;
+
+  const { data, error } = await supabase
+    .from("inventory_item")
+    .update({
+      status: "consumed",
+      consumed_at: new Date().toISOString(),
+      consumed_via: "recipe_cooked",
+    })
+    .eq("household_id", householdId)
+    .eq("status", "in_stock")
+    .in("id", [...new Set(inventoryItemIds)])
+    .select("id");
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).length;
+}
