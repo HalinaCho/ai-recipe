@@ -105,14 +105,19 @@ async function fetchIngredientsByRecipe(
   const byRecipe = new Map<string, RecipeIngredientRow[]>();
   if (recipeIds.length === 0) return byRecipe;
 
-  const rows = await fetchAllPages<RecipeIngredientRow>((from, to) =>
-    supabase
-      .from("recipe_ingredient")
-      .select()
-      .in("recipe_id", recipeIds)
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
+  const rows: RecipeIngredientRow[] = [];
+  for (const chunk of chunkIds(recipeIds)) {
+    rows.push(
+      ...(await fetchAllPages<RecipeIngredientRow>((from, to) =>
+        supabase
+          .from("recipe_ingredient")
+          .select()
+          .in("recipe_id", chunk)
+          .order("id", { ascending: true })
+          .range(from, to),
+      )),
+    );
+  }
 
   for (const row of rows) {
     const bucket = byRecipe.get(row.recipe_id);
@@ -122,6 +127,26 @@ async function fetchIngredientsByRecipe(
   return byRecipe;
 }
 
+/**
+ * id 목록을 URL에 실을 수 있는 크기로 자른다.
+ *
+ * PostgREST의 `.in()`은 id를 전부 쿼리스트링에 넣는다. 재고가 늘어 후보가
+ * 577개가 되자 URL이 21KB가 되어 **Bad Request**로 거부당했다 — 재고를
+ * 몇 개 더 담았을 뿐인데 레시피 탭이 통째로 죽는다. 재고가 적을 때는
+ * 멀쩡히 돌기 때문에 개발 중에는 드러나지 않는 종류의 한계다.
+ *
+ * 200은 식단표 쪽(lib/meal-plan/queries.ts)에서 이미 쓰던 값이다.
+ */
+const ID_CHUNK = 200;
+
+function chunkIds(ids: readonly string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let start = 0; start < ids.length; start += ID_CHUNK) {
+    chunks.push([...ids.slice(start, start + ID_CHUNK)]);
+  }
+  return chunks;
+}
+
 /** 주어진 id들의 레시피를 재료까지 붙여서 읽는다. 없는 id는 조용히 빠진다. */
 export async function fetchScorableRecipes(
   supabase: ServerSupabaseClient,
@@ -129,14 +154,19 @@ export async function fetchScorableRecipes(
 ): Promise<ScorableRecipe[]> {
   if (recipeIds.length === 0) return [];
 
-  const recipes = await fetchAllPages<RecipeRow>((from, to) =>
-    supabase
-      .from("recipe")
-      .select()
-      .in("id", recipeIds)
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
+  const recipes: RecipeRow[] = [];
+  for (const chunk of chunkIds(recipeIds)) {
+    recipes.push(
+      ...(await fetchAllPages<RecipeRow>((from, to) =>
+        supabase
+          .from("recipe")
+          .select()
+          .in("id", chunk)
+          .order("id", { ascending: true })
+          .range(from, to),
+      )),
+    );
+  }
 
   const ingredients = await fetchIngredientsByRecipe(
     supabase,
