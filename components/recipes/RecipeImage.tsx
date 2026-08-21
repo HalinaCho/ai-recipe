@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { IngredientIcon } from "@/components/ui/IngredientIcon";
 import { cn } from "@/lib/utils";
@@ -34,9 +35,10 @@ const FALLBACK_ICON_SIZE = {
  * 깨진 이미지 아이콘이 카드마다 박히는데, 그건 "사진이 없는 것"보다 훨씬
  * 고장 나 보인다. 원래 쓰던 재료 아이콘으로 돌아가면 아무 일도 없던 것처럼 된다.
  *
- * next/image를 안 쓰는 이유: 외부 도메인 최적화는 Vercel의 이미지 변환 쿼터를
- * 소모한다. 레시피가 1,156개라 목록을 몇 번만 훑어도 무료 한도를 넘길 수 있다.
- * 개인용 서비스에서 굳이 그 위험을 살 이유가 없어 lazy 로딩만 걸어 둔다.
+ * next/image를 쓰는 이유: 원본이 표시 크기와 한참 어긋난다. 완성 사진은
+ * 320px짜리를 썸네일 56px에 쓰고, 단계 사진은 613KB짜리를 6장 늘어놓는다.
+ * 표시 크기에 맞춰 줄이고 webp로 바꾸면 상세 화면이 3.8MB에서 수백 KB로 준다.
+ * (변환 쿼터를 걱정했으나 결과가 31일 캐시되고 가구 하나가 쓰는 서비스다.)
  */
 export function RecipeImage({
   src,
@@ -60,14 +62,13 @@ export function RecipeImage({
   }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- 위 주석 참고
-    <img
+    <Image
       src={src}
       alt={alt}
-      width={width}
-      height={height}
+      width={width ?? 400}
+      height={height ?? 400}
       loading="lazy"
-      decoding="async"
+      // 변환이 실패하거나 원본이 사라져도 깨진 아이콘을 남기지 않는다.
       onError={() => setFailed(true)}
       className={cn("object-cover", className)}
     />
