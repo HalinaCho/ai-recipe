@@ -17,6 +17,11 @@ export interface RecipeImageProps {
    */
   width?: number;
   height?: number;
+  /**
+   * 브라우저가 어느 크기로 받을지 정하는 힌트. 안 주면 뷰포트 기준으로
+   * 잡아서, 레이아웃이 448px 상한인데도 1920px짜리를 받아 온다.
+   */
+  sizes?: string;
   /** 히어로(상세 상단)인지 썸네일(목록)인지 — 폴백 아이콘 크기를 맞춘다. */
   size?: "thumb" | "hero" | "step";
 }
@@ -48,6 +53,8 @@ export function RecipeImage({
   size = "thumb",
   width,
   height,
+  // 앱 본문은 max-w-md(448px)를 넘지 않는다. 썸네일은 56px 고정.
+  sizes = size === "thumb" ? "56px" : "(max-width: 448px) 100vw, 448px",
 }: RecipeImageProps) {
   const [failed, setFailed] = useState(false);
 
@@ -67,6 +74,7 @@ export function RecipeImage({
       alt={alt}
       width={width ?? 400}
       height={height ?? 400}
+      sizes={sizes}
       loading="lazy"
       // 변환이 실패하거나 원본이 사라져도 깨진 아이콘을 남기지 않는다.
       onError={() => setFailed(true)}
