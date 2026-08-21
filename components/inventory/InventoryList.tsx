@@ -25,15 +25,19 @@ import { PreviewBadge } from "@/components/ui/PreviewBadge";
 export function InventoryList() {
   const { data, isPending, isError, error, refetch } = useInventory();
   const consume = useConsumeInventoryItem();
-  const [selected, setSelected] = useState<InventoryListItem | null>(null);
+  // 항목 자체가 아니라 **id만** 들고, 표시할 값은 매번 목록에서 찾는다.
+  // 객체를 들고 있으면 이름을 고쳐 목록이 갱신돼도 열려 있는 시트는 고치기
+  // 전 값을 계속 보여준다 — 저장이 안 된 것처럼 보인다.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
   const items = data?.items ?? [];
+  const selected = items.find((item) => item.id === selectedId) ?? null;
 
   const handleConfirm = (item: InventoryListItem, remainingFraction: number) => {
     consume.mutate(
       { id: item.id, consumedVia: "manual", remainingFraction },
-      { onSettled: () => setSelected(null) },
+      { onSettled: () => setSelectedId(null) },
     );
   };
 
@@ -63,7 +67,7 @@ export function InventoryList() {
                 <InventoryItemRow
                   item={item}
                   isOldest={index === 0}
-                  onSelect={setSelected}
+                  onSelect={(next) => setSelectedId(next.id)}
                 />
               </li>
             ))}
@@ -98,7 +102,7 @@ export function InventoryList() {
         item={selected}
         pending={consume.isPending}
         onConfirm={handleConfirm}
-        onClose={() => setSelected(null)}
+        onClose={() => setSelectedId(null)}
       />
     </div>
   );
