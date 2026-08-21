@@ -18,8 +18,10 @@ import { IngredientIcon } from "@/components/ui/IngredientIcon";
 export function ShoppingCandidatesCard({ slots }: { slots: MealPlanSlot[] }) {
   const counts = new Map<string, number>();
   for (const slot of slots) {
-    for (const name of slot.missingMainIngredients) {
-      counts.set(name, (counts.get(name) ?? 0) + 1);
+    for (const dish of slot.dishes) {
+      for (const name of dish.missingMainIngredients) {
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+      }
     }
   }
 

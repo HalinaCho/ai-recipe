@@ -129,17 +129,22 @@ export function useUpdateMealPlanEntry(weekStart: string) {
       if (previous) {
         queryClient.setQueryData<MealPlanResponse>(queryKey, {
           ...previous,
-          slots: previous.slots.map((slot) =>
-            slot.id === entryId
-              ? {
-                  ...slot,
-                  recipe,
-                  matchScore: recipe.match.score,
-                  missingMainIngredients: recipe.match.missingMainIngredients,
-                  source,
-                }
-              : slot,
-          ),
+          // FR-13-08: 교체 대상은 끼니가 아니라 그 안의 요리 하나다.
+          slots: previous.slots.map((slot) => ({
+            ...slot,
+            dishes: slot.dishes.map((dish) =>
+              dish.id === entryId
+                ? {
+                    ...dish,
+                    recipe,
+                    matchScore: recipe.match.score,
+                    missingMainIngredients:
+                      recipe.match.missingMainIngredients,
+                    source,
+                  }
+                : dish,
+            ),
+          })),
         });
       }
       return { previous };
@@ -153,8 +158,13 @@ export function useUpdateMealPlanEntry(weekStart: string) {
         current
           ? {
               ...current,
+              // 서버는 바뀐 요리가 속한 **끼니 전체**를 준다 — 국을 바꾸면
+              // 그 끼니의 반찬 매칭도 연쇄로 달라지기 때문이다.
               slots: current.slots.map((slot) =>
-                slot.id === data.slot.id ? data.slot : slot,
+                slot.date === data.slot.date &&
+                slot.mealType === data.slot.mealType
+                  ? data.slot
+                  : slot,
               ),
               nutrition: data.nutrition,
             }

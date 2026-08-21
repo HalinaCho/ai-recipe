@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { MealPlanSlot, RecipeListItem } from "@/types/api";
+import type {
+  MealPlanDish,
+  MealPlanSlot,
+  RecipeListItem,
+} from "@/types/api";
 import { Button } from "@/components/ui/Button";
 import { PreviewBadge } from "@/components/ui/PreviewBadge";
 import {
@@ -33,7 +37,7 @@ import { addDays, seoulToday, weekStartOf } from "./week";
 export function MealPlanView() {
   const [today, setToday] = useState<string | null>(null);
   const [weekStart, setWeekStart] = useState<string | null>(null);
-  const [activeSlot, setActiveSlot] = useState<MealPlanSlot | null>(null);
+  const [activeDish, setActiveDish] = useState<MealPlanDish | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -59,16 +63,20 @@ export function MealPlanView() {
     return [...grouped.entries()];
   }, [slots]);
 
-  const editedCount = slots.filter((slot) => slot.source !== "auto").length;
+  // 손댄 **요리** 수. 재생성 경고 문구가 "3개 끼니"가 아니라 "3가지 요리"여야
+  // 실제로 무엇이 날아가는지 맞다 (FR-13-08 이후 한 끼니에 요리가 여럿이다).
+  const editedCount = slots
+    .flatMap((slot) => slot.dishes)
+    .filter((dish) => dish.source !== "auto").length;
 
   const handleSelectRecipe = (
     recipe: RecipeListItem,
     source: "swapped" | "manual",
   ) => {
-    if (!activeSlot) return;
+    if (!activeDish) return;
     update.mutate(
-      { entryId: activeSlot.id, recipe, source },
-      { onSuccess: () => setActiveSlot(null) },
+      { entryId: activeDish.id, recipe, source },
+      { onSuccess: () => setActiveDish(null) },
     );
   };
 
@@ -160,10 +168,10 @@ export function MealPlanView() {
                 date={date}
                 slots={daySlots}
                 isToday={date === today}
-                onSwap={(slot) => {
+                onSwapDish={(_slot, dish) => {
                   // 지난 번 실패 메시지가 새로 연 시트에 남아 있으면 안 된다.
                   update.reset();
-                  setActiveSlot(slot);
+                  setActiveDish(dish);
                 }}
               />
             ))}
@@ -196,11 +204,11 @@ export function MealPlanView() {
         </>
       )}
 
-      {activeSlot && (
+      {activeDish && (
         <SwapMealModal
-          key={activeSlot.id}
-          slot={activeSlot}
-          onClose={() => setActiveSlot(null)}
+          key={activeDish.id}
+          dish={activeDish}
+          onClose={() => setActiveDish(null)}
           onSelect={handleSelectRecipe}
           isPending={update.isPending}
           errorMessage={

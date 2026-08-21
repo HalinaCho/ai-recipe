@@ -1,6 +1,6 @@
 "use client";
 
-import type { MealPlanSlot } from "@/types/api";
+import type { MealPlanDish, MealPlanSlot } from "@/types/api";
 import { cn } from "@/lib/utils";
 import { formatDayLabel } from "./format";
 import { MealSlotCard } from "./MealSlotCard";
@@ -10,7 +10,7 @@ export interface MealPlanDayCardProps {
   date: string;
   slots: MealPlanSlot[];
   isToday: boolean;
-  onSwap: (slot: MealPlanSlot) => void;
+  onSwapDish: (slot: MealPlanSlot, dish: MealPlanDish) => void;
 }
 
 /**
@@ -23,7 +23,7 @@ export function MealPlanDayCard({
   date,
   slots,
   isToday,
-  onSwap,
+  onSwapDish,
 }: MealPlanDayCardProps) {
   const holidayName = slots.find((slot) => slot.holidayName)?.holidayName ?? null;
   const isHoliday = slots.some((slot) => slot.isHoliday);
@@ -62,8 +62,8 @@ export function MealPlanDayCard({
 
       <ul className="flex flex-col gap-2">
         {slots.map((slot) => (
-          <li key={slot.id}>
-            <MealSlotCard slot={slot} onSwap={() => onSwap(slot)} />
+          <li key={`${slot.date}-${slot.mealType}`}>
+            <MealSlotCard slot={slot} onSwapDish={onSwapDish} />
           </li>
         ))}
       </ul>

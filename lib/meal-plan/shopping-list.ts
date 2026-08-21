@@ -23,34 +23,41 @@ export function buildShoppingList(
   const byName = new Map<string, ShoppingListEntry>();
 
   for (const slot of slots) {
-    // 제철이 아닌 재료는 이 칸의 날짜 기준으로 판단한다. 한 주가 월을 걸치면
-    // 월요일과 일요일의 제철이 다를 수 있다.
-    const outOfSeason = new Set(
-      outOfSeasonPurchases(slot.missingMainIngredients, monthOf(slot.date)),
-    );
+    // 제철이 아닌 재료는 이 끼니의 날짜 기준으로 판단한다. 한 주가 월을
+    // 걸치면 월요일과 일요일의 제철이 다를 수 있다.
+    const month = monthOf(slot.date);
 
-    for (const name of slot.missingMainIngredients) {
-      const found = byName.get(name);
-      const usage = {
-        recipeId: slot.recipe.id,
-        recipeName: slot.recipe.name,
-        date: slot.date,
-        mealType: slot.mealType,
-      };
+    // FR-13-08: 한 끼니에 요리가 여럿이므로 요리마다 훑는다. 국이 부족한지
+    // 반찬이 부족한지가 목록에 남아야 "뭘 포기할지"를 사용자가 고를 수 있다.
+    for (const dish of slot.dishes) {
+      const outOfSeason = new Set(
+        outOfSeasonPurchases(dish.missingMainIngredients, month),
+      );
 
-      if (found) {
-        // 같은 레시피가 한 주에 두 번 오지는 않지만(FR-13-02), 스왑으로
-        // 같은 요리가 다른 칸에 들어올 수는 있다. 끼니 기준으로 센다.
-        found.usedIn.push(usage);
-        // 한 번이라도 제철이면 "제철 아님" 딱지를 떼 준다 — 언제 사도 되는
-        // 재료를 계속 경고하면 경고가 무뎌진다.
-        found.outOfSeason = found.outOfSeason && outOfSeason.has(name);
-      } else {
-        byName.set(name, {
-          normalizedName: name,
-          usedIn: [usage],
-          outOfSeason: outOfSeason.has(name),
-        });
+      for (const name of dish.missingMainIngredients) {
+        const found = byName.get(name);
+        const usage = {
+          recipeId: dish.recipe.id,
+          recipeName: dish.recipe.name,
+          date: slot.date,
+          mealType: slot.mealType,
+          role: dish.role,
+        };
+
+        if (found) {
+          // 같은 레시피가 한 주에 두 번 오지는 않지만(FR-13-02), 스왑으로
+          // 같은 요리가 다른 끼니에 들어올 수는 있다. 요리 기준으로 센다.
+          found.usedIn.push(usage);
+          // 한 번이라도 제철이면 "제철 아님" 딱지를 떼 준다 — 언제 사도 되는
+          // 재료를 계속 경고하면 경고가 무뎌진다.
+          found.outOfSeason = found.outOfSeason && outOfSeason.has(name);
+        } else {
+          byName.set(name, {
+            normalizedName: name,
+            usedIn: [usage],
+            outOfSeason: outOfSeason.has(name),
+          });
+        }
       }
     }
   }

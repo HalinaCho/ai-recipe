@@ -10,6 +10,7 @@ import type { RecipeStep } from "@/lib/recipes/steps";
 import type {
   Household,
   InventoryItem,
+  MealPlanDishRole,
   MealType,
   Member,
   StorageType,
@@ -294,6 +295,7 @@ export interface ShoppingListEntry {
     recipeName: string;
     date: string;
     mealType: MealType;
+    role: MealPlanDishRole;
   }[];
   /** FR-13-07: 지금 사기엔 제철이 아닌 재료. 모든 끼니에서 제철이 아닐 때만 true. */
   outOfSeason: boolean;
@@ -351,12 +353,37 @@ export interface CookChecklistResponse {
 // ---------------------------------------------------------------------------
 
 /**
- * 식단표의 한 칸. 레시피가 반드시 채워져 있다 — FR-13-03이 매칭률이 아무리
- * 낮아도 1위 후보를 넣으라고 못 박았기 때문에 빈 칸은 존재하지 않는다.
+ * 상차림의 요리 하나 (FR-13-08). meal_plan_entry 한 행에 대응한다.
+ *
+ * 스왑(FR-12-02)·직접선택(FR-12-03)은 **끼니가 아니라 요리 단위**로 일어난다.
+ * 국만 바꾸고 반찬은 두고 싶은 게 자연스럽기 때문이다.
+ */
+export interface MealPlanDish {
+  /** meal_plan_entry.id. 교체 대상. */
+  id: string;
+  role: MealPlanDishRole;
+  recipe: RecipeListItem;
+  /**
+   * 배치 시점에 계산된 점수 (FR-13-04의 3항 공식 × 제철 감점).
+   * 목록 화면의 match.score와 값이 다를 수 있다 — 식단표는 앞선 요리가
+   * 재료를 써서 줄어든 **가상 재고** 위에서 계산하기 때문이다.
+   */
+  matchScore: number;
+  /** FR-13-05: 이 요리의 장보기 후보. */
+  missingMainIngredients: string[];
+  /** FR-13-07: 장보기 후보 중 지금 제철이 아닌 것. 보유 재료는 안 들어온다. */
+  outOfSeasonIngredients: string[];
+  source: "auto" | "swapped" | "manual";
+}
+
+/**
+ * 식단표의 한 끼니. 요리가 하나 이상 반드시 들어 있다 — FR-13-03이 매칭률이
+ * 아무리 낮아도 채우라고 못 박았기 때문에 빈 끼니는 존재하지 않는다.
+ *
+ * 일품(볶음밥·카레 등)이 뽑히면 dishes가 하나뿐이고, 아니면 국·찌개 하나에
+ * 반찬이 붙어 두셋이 된다 (FR-13-08).
  */
 export interface MealPlanSlot {
-  /** meal_plan_entry.id. 스왑(FR-12-02)·직접선택(FR-12-03)의 대상. */
-  id: string;
   /** YYYY-MM-DD (Asia/Seoul). */
   date: string;
   mealType: MealType;
@@ -364,22 +391,7 @@ export interface MealPlanSlot {
   isHoliday: boolean;
   /** 공휴일일 때의 이름 (예: "광복절"). 아니면 null. */
   holidayName: string | null;
-  recipe: RecipeListItem;
-  /**
-   * 배치 시점에 계산된 점수 (FR-13-04의 3항 공식). 목록 화면의
-   * RecipeListItem.match.score와 값이 다를 수 있다 — 식단표는 앞선 요일이
-   * 재료를 써서 줄어든 **가상 재고** 위에서 계산하기 때문이다.
-   */
-  matchScore: number;
-  /** FR-13-05: 이 칸의 장보기 후보. */
-  missingMainIngredients: string[];
-  /**
-   * FR-13-07: 장보기 후보 중 지금 **제철이 아닌** 것.
-   * missingMainIngredients의 부분집합이며, 이미 갖고 있는 재료는 들어오지
-   * 않는다 — 냉장고의 감귤은 8월이어도 먹어 없애야 할 재고다.
-   */
-  outOfSeasonIngredients: string[];
-  source: "auto" | "swapped" | "manual";
+  dishes: MealPlanDish[];
 }
 
 /** FR-14-01: 주간 합계. 정보 제공 수준이며 목표치 비교는 하지 않는다. */

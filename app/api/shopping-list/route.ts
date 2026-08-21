@@ -54,8 +54,8 @@ export async function GET(request: Request) {
       weekEndDate: plan.weekEndDate,
       items: buildShoppingList(plan.slots),
       totalSlots: plan.slots.length,
-      slotsNeedingShopping: plan.slots.filter(
-        (slot) => slot.missingMainIngredients.length > 0,
+      slotsNeedingShopping: plan.slots.filter((slot) =>
+        slot.dishes.some((dish) => dish.missingMainIngredients.length > 0),
       ).length,
     };
     return NextResponse.json(response);

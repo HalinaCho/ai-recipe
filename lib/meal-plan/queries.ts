@@ -13,9 +13,11 @@ import {
   placeWeek,
   replayWeek,
   slotKey,
-  type LockedSlot,
-  type PlacedSlot,
+  type LockedDish,
+  type PlacedDish,
+  type StoredDish,
 } from "@/lib/meal-plan/generate";
+import { dishRoleOf } from "@/lib/meal-plan/composition";
 import { loadHolidays } from "@/lib/meal-plan/holidays";
 import {
   summarizeWeeklyNutrition,
@@ -366,6 +368,29 @@ async function ensurePlanId(
   return created;
 }
 
+/**
+ * 저장된 행 → 배치 엔진이 읽는 요리.
+ *
+ * dish_role이 비어 있는 행(0010 이전에 저장된 식단표)은 분류에서 다시 유도한다.
+ * 마이그레이션 시점에 이미 짜여 있던 주가 통째로 깨지지 않게 하려는 것이다.
+ */
+function toStoredDish(
+  row: MealPlanEntryRow & { recipe_id: string },
+  holidayName: string | null,
+  categoryById?: ReadonlyMap<string, string | null>,
+): StoredDish {
+  return {
+    date: row.date,
+    mealType: row.meal_type,
+    isHoliday: row.is_holiday,
+    holidayName,
+    recipeId: row.recipe_id,
+    role:
+      row.dish_role ?? dishRoleOf(categoryById?.get(row.recipe_id) ?? null),
+    source: row.source,
+  };
+}
+
 async function readEntries(
   supabase: ServerSupabaseClient,
   planId: string,
@@ -393,27 +418,35 @@ async function readEntries(
 async function writeEntries(
   supabase: ServerSupabaseClient,
   planId: string,
-  placed: PlacedSlot[],
+  placed: PlacedDish[],
 ): Promise<void> {
   const { error } = await supabase.from("meal_plan_entry").upsert(
-    placed.map((slot) => ({
+    placed.map((dish) => ({
       weekly_meal_plan_id: planId,
-      date: slot.date,
-      meal_type: slot.mealType,
-      is_holiday: slot.isHoliday,
-      recipe_id: slot.recipe.id,
-      match_score: slot.score.score,
-      missing_main_ingredients: slot.score.missingMainIngredients,
-      source: slot.source,
+      date: dish.date,
+      meal_type: dish.mealType,
+      is_holiday: dish.isHoliday,
+      dish_role: dish.role,
+      recipe_id: dish.recipe.id,
+      match_score: dish.score.score,
+      missing_main_ingredients: dish.score.missingMainIngredients,
+      source: dish.source,
     })),
-    { onConflict: "weekly_meal_plan_id,date,meal_type" },
+    { onConflict: "weekly_meal_plan_id,date,meal_type,recipe_id" },
   );
   if (error) throw new Error(error.message);
 
-  const keep = new Set(placed.map((slot) => slotKey(slot.date, slot.mealType)));
+  // 요리 단위로 남길 것을 판단한다. 상차림 구성이 바뀌면(반찬 수가 줄거나
+  // 일품 단독으로 바뀌면) 이전 계산의 요리가 남아 상이 뒤섞인다.
+  const keep = new Set(
+    placed.map((dish) => `${slotKey(dish.date, dish.mealType)}|${dish.recipe.id}`),
+  );
   const existing = await readEntries(supabase, planId);
   const staleIds = existing
-    .filter((row) => !keep.has(slotKey(row.date, row.meal_type)))
+    .filter(
+      (row) =>
+        !keep.has(`${slotKey(row.date, row.meal_type)}|${row.recipe_id ?? ""}`),
+    )
     .map((row) => row.id);
 
   if (staleIds.length > 0) {
@@ -457,14 +490,7 @@ function buildWeek(
   );
 
   const placed = replayWeek(
-    withRecipe.map((row) => ({
-      date: row.date,
-      mealType: row.meal_type,
-      isHoliday: row.is_holiday,
-      holidayName: holidays.get(row.date) ?? null,
-      recipeId: row.recipe_id,
-      source: row.source,
-    })),
+    withRecipe.map((row) => toStoredDish(row, holidays.get(row.date) ?? null)),
     recipes,
     context.inventory,
     context.purchaseShares,
@@ -472,39 +498,63 @@ function buildWeek(
     matchingConfig,
   );
 
-  const entryByKey = new Map(
-    withRecipe.map((row) => [slotKey(row.date, row.meal_type), row]),
+  // 같은 (끼니, 레시피)로 저장된 행을 찾아 id·배치 점수를 붙인다.
+  const rowByDish = new Map(
+    withRecipe.map((row) => [
+      `${slotKey(row.date, row.meal_type)}|${row.recipe_id}`,
+      row,
+    ]),
   );
   const nutritionById = new Map(
     recipes.map((recipe) => [recipe.id, recipe.nutrition]),
   );
 
-  const slots: MealPlanSlot[] = placed.flatMap((slot) => {
-    const row = entryByKey.get(slotKey(slot.date, slot.mealType));
-    if (!row) return [];
+  // 요리를 끼니로 묶는다. placed는 이미 시간순이라 끼니가 나온 순서를 그대로
+  // 유지하면 화면 순서(FR-11-01)도 맞는다.
+  const slotByKey = new Map<string, MealPlanSlot>();
+  const slots: MealPlanSlot[] = [];
+  const usedRecipeIds: string[] = [];
 
-    const match = toRecipeMatch(slot.score, matchingConfig);
-    return [
-      {
-        id: row.id,
-        date: slot.date,
-        mealType: slot.mealType,
-        isHoliday: slot.isHoliday,
-        holidayName: slot.holidayName,
-        recipe: toListItem(slot.recipe, match, matchingConfig),
-        // 배치 시점 점수. 저장된 값이 없으면(구버전 행) 지금 값으로 메운다.
-        matchScore: row.match_score ?? slot.score.score,
-        missingMainIngredients: slot.score.missingMainIngredients,
-        outOfSeasonIngredients: slot.score.outOfSeasonIngredients,
-        source: slot.source,
-      },
-    ];
-  });
+  for (const dish of placed) {
+    const row = rowByDish.get(
+      `${slotKey(dish.date, dish.mealType)}|${dish.recipe.id}`,
+    );
+    if (!row) continue;
+
+    const key = slotKey(dish.date, dish.mealType);
+    let slot = slotByKey.get(key);
+    if (!slot) {
+      slot = {
+        date: dish.date,
+        mealType: dish.mealType,
+        isHoliday: dish.isHoliday,
+        holidayName: dish.holidayName,
+        dishes: [],
+      };
+      slotByKey.set(key, slot);
+      slots.push(slot);
+    }
+
+    const match = toRecipeMatch(dish.score, matchingConfig);
+    slot.dishes.push({
+      id: row.id,
+      role: dish.role,
+      recipe: toListItem(dish.recipe, match, matchingConfig),
+      // 배치 시점 점수. 저장된 값이 없으면(구버전 행) 지금 값으로 메운다.
+      matchScore: row.match_score ?? dish.score.score,
+      missingMainIngredients: dish.score.missingMainIngredients,
+      outOfSeasonIngredients: dish.score.outOfSeasonIngredients,
+      source: dish.source,
+    });
+    usedRecipeIds.push(dish.recipe.id);
+  }
 
   return {
     slots,
+    // FR-14-01: 영양 합계는 **요리 단위**로 더한다. 한 끼에 국과 반찬이
+    // 올라가면 그 둘을 다 먹는 것이므로, 끼니당 하나만 세면 실제보다 적게 나온다.
     nutrition: summarizeWeeklyNutrition(
-      slots.map((slot) => nutritionById.get(slot.recipe.id) ?? null),
+      usedRecipeIds.map((id) => nutritionById.get(id) ?? null),
     ),
   };
 }
@@ -548,16 +598,21 @@ async function readWeek(
 function lockedFromEntries(
   entries: MealPlanEntryRow[],
   includeEdited: boolean,
-): Map<string, LockedSlot> {
-  const locked = new Map<string, LockedSlot>();
+): Map<string, LockedDish[]> {
+  const locked = new Map<string, LockedDish[]>();
   if (includeEdited) return locked;
 
   for (const row of entries) {
     if (row.source === "auto" || !row.recipe_id) continue;
-    locked.set(slotKey(row.date, row.meal_type), {
+    const key = slotKey(row.date, row.meal_type);
+    const dish: LockedDish = {
       recipeId: row.recipe_id,
+      role: row.dish_role ?? "side",
       source: row.source,
-    });
+    };
+    const bucket = locked.get(key);
+    if (bucket) bucket.push(dish);
+    else locked.set(key, [dish]);
   }
   return locked;
 }
@@ -567,7 +622,7 @@ async function generateInto(
   householdId: string,
   planId: string,
   plannedSlots: PlannedSlot[],
-  locked: Map<string, LockedSlot>,
+  locked: Map<string, LockedDish[]>,
   config: MealPlanConfig,
   matchingConfig: MatchingConfig,
 ): Promise<void> {
@@ -579,6 +634,7 @@ async function generateInto(
   // 되돌려 버려, 직접 고른 끼니가 재생성 한 번에 날아간다.
   const poolIds = new Set(pool.map((recipe) => recipe.id));
   const missingLocked = [...locked.values()]
+    .flat()
     .map((lock) => lock.recipeId)
     .filter((id) => !poolIds.has(id));
 
@@ -759,16 +815,7 @@ function virtualStateAt(
   const placed = replayWeek(
     upToTarget.flatMap((row) =>
       row.recipe_id
-        ? [
-            {
-              date: row.date,
-              mealType: row.meal_type,
-              isHoliday: row.is_holiday,
-              holidayName: null,
-              recipeId: row.recipe_id,
-              source: row.source,
-            },
-          ]
+        ? [toStoredDish(row as MealPlanEntryRow & { recipe_id: string }, null)]
         : [],
     ),
     recipes,
@@ -947,7 +994,11 @@ export async function replaceEntryRecipe(
     matchingConfig,
   );
 
-  const slot = week.slots.find((item) => item.id === entryId);
+  // 바뀐 요리가 속한 **끼니 전체**를 돌려준다. 국을 바꾸면 그 끼니의 반찬
+  // 매칭도 함께 흔들리므로(연쇄 계산), 요리 하나만 주면 화면이 낡은 값을 든다.
+  const slot = week.slots.find((item) =>
+    item.dishes.some((dish) => dish.id === entryId),
+  );
   if (!slot) return null;
 
   return { slot, nutrition: week.nutrition };

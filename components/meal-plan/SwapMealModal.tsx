@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { MealPlanSlot, RecipeListItem } from "@/types/api";
+import type { MealPlanDish, RecipeListItem } from "@/types/api";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -15,14 +15,14 @@ import {
 import { useMealPlanCandidates } from "@/lib/hooks/use-meal-plan";
 import { useRecipes } from "@/lib/hooks/use-recipes";
 import { cn } from "@/lib/utils";
-import { formatDayLabel, formatMealType } from "./format";
+import { DISH_ROLE_LABEL } from "@/lib/meal-plan/composition";
 
 /** 검색 결과를 다 그리면 스크롤이 끝없이 길어진다 — 위에서부터 이만큼만. */
 const SEARCH_RESULT_LIMIT = 20;
 
 export interface SwapMealModalProps {
   /** null이면 닫힌 상태. */
-  slot: MealPlanSlot | null;
+  dish: MealPlanDish | null;
   onClose: () => void;
   onSelect: (recipe: RecipeListItem, source: "swapped" | "manual") => void;
   isPending: boolean;
@@ -39,21 +39,21 @@ type Tab = "candidates" | "search";
  * 그래서 직접 찾아 고르는 길을 같은 깊이에 나란히 놓는다.
  */
 export function SwapMealModal({
-  slot,
+  dish,
   onClose,
   onSelect,
   isPending,
   errorMessage,
 }: SwapMealModalProps) {
-  const open = slot !== null;
+  const open = dish !== null;
   const [tab, setTab] = useState<Tab>("candidates");
   const [query, setQuery] = useState("");
 
-  const candidates = useMealPlanCandidates(slot?.id ?? "", open);
+  const candidates = useMealPlanCandidates(dish?.id ?? "", open);
   // 직접 고르기 탭을 열었을 때만 전체 목록을 부른다 (레시피 탭과 같은 캐시를 쓴다).
   const recipes = useRecipes();
 
-  const currentRecipeId = slot?.recipe.id ?? "";
+  const currentRecipeId = dish?.recipe.id ?? "";
 
   const searchResults = useMemo(() => {
     const all = recipes.data?.recipes ?? [];
@@ -66,7 +66,7 @@ export function SwapMealModal({
       .slice(0, SEARCH_RESULT_LIMIT);
   }, [recipes.data, query, currentRecipeId]);
 
-  if (!slot) return null;
+  if (!dish) return null;
 
   const candidateList = candidates.data?.candidates ?? [];
 
@@ -80,10 +80,10 @@ export function SwapMealModal({
 
         <div className="flex shrink-0 flex-col gap-1">
           <p className="text-label-md text-primary">
-            {formatDayLabel(slot.date)} {formatMealType(slot.mealType)}
+            {DISH_ROLE_LABEL[dish.role]}
           </p>
           <h2 className="text-headline-md text-on-surface">
-            {slot.recipe.name} 대신 뭐 드실래요?
+            {dish.recipe.name} 대신 뭐 드실래요?
           </h2>
           <p className="text-body-md text-on-surface-variant">
             고르면 바로 바뀌어요. 이번 주에 이미 넣은 요리는 후보에서 빼뒀어요.

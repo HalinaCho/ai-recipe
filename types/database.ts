@@ -281,6 +281,7 @@ export interface Database {
           recipe_id: string | null;
           match_score: number | null;
           missing_main_ingredients: string[];
+          dish_role: "main" | "soup" | "side" | null;
           source: "auto" | "swapped" | "manual";
         };
         Insert: {
@@ -292,6 +293,7 @@ export interface Database {
           recipe_id?: string | null;
           match_score?: number | null;
           missing_main_ingredients?: string[];
+          dish_role?: "main" | "soup" | "side" | null;
           source: "auto" | "swapped" | "manual";
         };
         Update: Partial<

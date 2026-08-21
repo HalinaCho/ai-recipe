@@ -43,6 +43,14 @@ export interface MealPlanConfig {
    * FR-13-03이 빈 칸을 금지하기 때문이다.
    */
   seasonPenalty: number;
+  /**
+   * FR-13-08: 한 끼니에 붙일 반찬 수의 상한. 국 1 + 반찬 N이 기본 상차림이다.
+   *
+   * 2로 잡은 이유: 국 하나에 반찬 둘이면 상이 차 보이면서도, 한 주 10끼면
+   * 요리 30가지라 장보기가 감당할 만한 선이다. 3으로 올리면 부족 재료가
+   * 급격히 늘어 "살 게 너무 많은" 목록이 된다.
+   */
+  sidesPerMeal: number;
   /** FR-12-02: 스왑 모달에 뿌릴 후보 개수. */
   swapCandidateCount: number;
   /**
@@ -64,6 +72,7 @@ export const DEFAULT_MEAL_PLAN_CONFIG: MealPlanConfig = {
     "other",
   ],
   seasonPenalty: 0.7,
+  sidesPerMeal: 2,
   swapCandidateCount: 20,
   candidatePoolSize: 300,
 };

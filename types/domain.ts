@@ -114,6 +114,12 @@ export interface Recipe {
 
 export type MealType = "lunch" | "dinner";
 
+/**
+ * FR-13-08: 상차림에서의 자리.
+ * main = 일품(그 자체로 한 끼) · soup = 국·찌개 · side = 반찬
+ */
+export type MealPlanDishRole = "main" | "soup" | "side";
+
 export interface MealPlanEntry {
   /** meal_plan_entry.id — 스왑·직접선택(FR-12-02·03)이 지목하는 대상. */
   id: string;

@@ -18,7 +18,7 @@ import type {
   UpdateMealPlanEntryResponse,
   WeeklyNutritionSummary,
 } from "@/types/api";
-import type { MealType } from "@/types/domain";
+import type { MealPlanDishRole, MealType } from "@/types/domain";
 import { DEFAULT_MEAL_PLAN_CONFIG } from "@/lib/meal-plan/config";
 import {
   addDays,
@@ -393,13 +393,17 @@ function mealTypesFor(date: string, isHoliday: boolean): MealType[] {
   return isWeekendDay || isHoliday ? ["lunch", "dinner"] : ["dinner"];
 }
 
-export function mealPlanFixtureEntryId(date: string, mealType: MealType): string {
-  return `mp-${date}-${mealType}`;
+export function mealPlanFixtureEntryId(
+  date: string,
+  mealType: MealType,
+  position = 0,
+): string {
+  return `mp-${date}-${mealType}-${position}`;
 }
 
 /** entryId → 날짜. 후보 목록이 "그 주에 이미 쓴 레시피"를 알아야 해서 필요하다. */
 function dateFromEntryId(entryId: string): string | null {
-  const matched = /^mp-(\d{4}-\d{2}-\d{2})-(lunch|dinner)$/.exec(entryId);
+  const matched = /^mp-(\d{4}-\d{2}-\d{2})-(lunch|dinner)-\d+$/.exec(entryId);
   if (!matched || !isISODate(matched[1])) return null;
   return matched[1];
 }
@@ -462,9 +466,10 @@ const POOL_NUTRITION_BY_RECIPE_ID = new Map(
  * 교체로 들어온 목록 밖 레시피도 여기서는 영양정보 없음으로 본다.
  */
 function summarizeNutrition(slots: MealPlanSlot[]): WeeklyNutritionSummary {
-  const summary = emptyNutrition(slots.length);
-  for (const slot of slots) {
-    const nutrition = POOL_NUTRITION_BY_RECIPE_ID.get(slot.recipe.id) ?? null;
+  const dishes = slots.flatMap((slot) => slot.dishes);
+  const summary = emptyNutrition(dishes.length);
+  for (const dish of dishes) {
+    const nutrition = POOL_NUTRITION_BY_RECIPE_ID.get(dish.recipe.id) ?? null;
     if (!nutrition) continue;
     summary.calories += nutrition.calories;
     summary.carbohydrate += nutrition.carbohydrate;
@@ -494,27 +499,42 @@ function buildFixtureWeek(weekStart: string): MealPlanSlot[] {
     weekIndexOf(weekStart) + mealPlanRegenerationSeed * 3,
   );
 
+  // FR-13-08: 한 끼니에 요리를 여럿 담는다. 풀에서 순서대로 떼어 국·반찬을
+  // 붙이되, 세 끼니에 한 번은 일품 단독 상차림을 만들어 두 모양을 다 볼 수 있게 한다.
+  let cursor = 0;
   return blanks.map((blank, index) => {
-    const id = mealPlanFixtureEntryId(blank.date, blank.mealType);
-    const swapped = mealPlanSwaps.get(id);
-    const recipe = swapped?.recipe ?? recipes[index].recipe;
+    const standalone = index % 3 === 0;
+    const count = standalone ? 1 : 1 + DEFAULT_MEAL_PLAN_CONFIG.sidesPerMeal;
+    const roles: MealPlanDishRole[] = standalone
+      ? ["main"]
+      : ["soup", ...Array<MealPlanDishRole>(count - 1).fill("side")];
+
+    const dishes = roles.map((role, position) => {
+      const id = mealPlanFixtureEntryId(blank.date, blank.mealType, position);
+      const swapped = mealPlanSwaps.get(id);
+      const recipe = swapped?.recipe ?? recipes[cursor++ % recipes.length].recipe;
+      return {
+        id,
+        role,
+        recipe,
+        matchScore: recipe.match.score,
+        missingMainIngredients: recipe.match.missingMainIngredients,
+        // FR-13-07: 픽스처에서도 제철 경고가 실제로 어떻게 보이는지 확인할 수
+        // 있어야 한다. 부족 재료 중 이 달에 제철이 아닌 것을 그대로 계산한다.
+        outOfSeasonIngredients: outOfSeasonPurchases(
+          recipe.match.missingMainIngredients,
+          monthOf(blank.date),
+        ),
+        source: swapped?.source ?? ("auto" as const),
+      };
+    });
 
     return {
-      id,
       date: blank.date,
       mealType: blank.mealType,
       isHoliday: blank.holidayName !== null,
       holidayName: blank.holidayName,
-      recipe,
-      matchScore: recipe.match.score,
-      missingMainIngredients: recipe.match.missingMainIngredients,
-      // FR-13-07: 픽스처에서도 제철 경고가 실제로 어떻게 보이는지 확인할 수
-      // 있어야 한다. 부족 재료 중 이 달에 제철이 아닌 것을 그대로 계산한다.
-      outOfSeasonIngredients: outOfSeasonPurchases(
-        recipe.match.missingMainIngredients,
-        monthOf(blank.date),
-      ),
-      source: swapped?.source ?? "auto",
+      dishes,
     };
   });
 }
@@ -554,8 +574,9 @@ export async function loadMealPlanCandidatesFixture(
 ): Promise<MealPlanCandidatesResponse> {
   const date = dateFromEntryId(entryId);
   const slots = date ? buildFixtureWeek(weekStartOf(date)) : [];
-  const current = slots.find((slot) => slot.id === entryId);
-  const placedIds = new Set(slots.map((slot) => slot.recipe.id));
+  const allDishes = slots.flatMap((slot) => slot.dishes);
+  const current = allDishes.find((dish) => dish.id === entryId);
+  const placedIds = new Set(allDishes.map((dish) => dish.recipe.id));
 
   const candidates = MEAL_PLAN_POOL.filter(
     (entry) => !placedIds.has(entry.recipe.id),
@@ -583,7 +604,9 @@ export async function updateMealPlanEntryFixture(
 
   const date = dateFromEntryId(entryId);
   const slots = date ? buildFixtureWeek(weekStartOf(date)) : [];
-  const slot = slots.find((entry) => entry.id === entryId);
+  const slot = slots.find((entry) =>
+    entry.dishes.some((dish) => dish.id === entryId),
+  );
   if (!slot) {
     throw new Error("샘플 데이터에 없는 끼니예요. (?preview=off 로 끄기)");
   }
