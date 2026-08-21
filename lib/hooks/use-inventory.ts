@@ -30,6 +30,8 @@ export function useInventory() {
 export interface ConsumeInventoryItemVariables {
   id: string;
   consumedVia: ConsumeInventoryItemRequest["consumedVia"];
+  /** 쓰고 남길 비율 (FR-05-03). 생략하면 전량 소진. */
+  remainingFraction?: number;
 }
 
 /**
@@ -47,7 +49,7 @@ export function useConsumeInventoryItem() {
     ConsumeInventoryItemVariables,
     { previous?: InventoryListResponse }
   >({
-    mutationFn: async ({ id, consumedVia }) => {
+    mutationFn: async ({ id, consumedVia, remainingFraction = 0 }) => {
       if (isFixturePreview()) {
         // No backend in preview mode; the optimistic removal stands in for it.
         await new Promise((resolve) => setTimeout(resolve, 350));
@@ -55,7 +57,10 @@ export function useConsumeInventoryItem() {
       }
       return apiFetch<ConsumeInventoryItemResponse>(`/api/inventory/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ consumedVia } satisfies ConsumeInventoryItemRequest),
+        body: JSON.stringify({
+          consumedVia,
+          remainingFraction,
+        } satisfies ConsumeInventoryItemRequest),
       });
     },
     onMutate: async ({ id }) => {

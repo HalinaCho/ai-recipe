@@ -29,10 +29,15 @@ export interface HouseholdMembersResponse {
 // M1 — inventory
 // ---------------------------------------------------------------------------
 
-/** One row of the 재고 tab, already FIFO-ordered by the server (FR-04-02). */
+/** 재고 탭의 한 줄. 서버가 이미 소진 우선순위로 정렬해서 준다 (FR-04-02). */
 export interface InventoryListItem extends InventoryItem {
-  /** Whole days since purchase — drives the "오래된 순" visual emphasis. */
+  /** 구매 후 경과일. 화면에는 "5일 전"처럼 그대로 쓴다. */
   daysSincePurchase: number;
+  /**
+   * 경과일 ÷ 보관방식별 기준일수. 1을 넘으면 한참 지난 것.
+   * 정렬 기준이자, 화면이 "먼저 드세요"를 어디까지 붙일지 판단하는 근거다.
+   */
+  elapsedRatio: number;
 }
 
 /** GET /api/inventory — in-stock items, oldest purchase first. */
@@ -47,6 +52,11 @@ export interface InventoryListResponse {
  */
 export interface ConsumeInventoryItemRequest {
   consumedVia: "manual" | "recipe_cooked";
+  /**
+   * 쓰고 **남길** 비율 (FR-05-03). 0 = 다 씀(기본), 0.5 = 반 남김.
+   * 0이 아니면 재고에 그대로 남아 계속 레시피 매칭에 잡힌다.
+   */
+  remainingFraction?: number;
 }
 
 export interface ConsumeInventoryItemResponse {
@@ -194,6 +204,11 @@ export interface RecipeDetailResponse {
 export interface CookRecipeRequest {
   /** 소진 처리할 inventory_item id 목록. */
   consumedInventoryItemIds: string[];
+  /**
+   * 항목별로 **남길** 비율 (FR-05-03). 생략하거나 0이면 전량 소진.
+   * 0보다 크면 재고에 남아 계속 레시피 매칭에 잡힌다.
+   */
+  remainingFractions?: Record<string, number>;
 }
 
 export interface CookRecipeResponse {

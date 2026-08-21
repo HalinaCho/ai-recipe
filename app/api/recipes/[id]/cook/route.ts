@@ -105,6 +105,7 @@ export async function POST(
       supabase,
       context.householdId,
       ids,
+      body?.remainingFractions ?? {},
     );
 
     // 체크를 전부 해제하고 눌렀으면 0건이 정상이다. 이미 소진된 항목을

@@ -39,13 +39,24 @@ export interface ProcessedMailRecord {
   extractionStatus: "success" | "failed" | "partial";
 }
 
+/** FR-04-04. 주문 메일의 상품명 표기 → 재료명 추정 → unknown 순으로 정해진다. */
+export type StorageType =
+  | "refrigerated"
+  | "frozen"
+  | "room_temp"
+  | "unknown";
+
 export interface InventoryItem {
   id: string;
   householdId: string;
   normalizedName: string;
   rawName: string;
   quantity: string;
-  purchasedAt: string; // FIFO sort key
+  purchasedAt: string;
+  /** 보관 방식. 정렬 우선순위를 좌우한다 (FR-04-02). */
+  storageType: StorageType;
+  /** 1 = 미개봉, 0.5 = 반 남음, 0 = 소진 (FR-05-03). 단위 환산은 하지 않는다. */
+  remainingFraction: number;
   sourceMailConnectionId: string | null;
   status: "in_stock" | "consumed";
   consumedAt: string | null;

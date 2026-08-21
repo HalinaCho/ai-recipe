@@ -6,7 +6,7 @@ import { Chip } from "@/components/ui/Chip";
 import { IngredientIcon } from "@/components/ui/IngredientIcon";
 import { useInventory } from "@/lib/hooks/use-inventory";
 import { cn } from "@/lib/utils";
-import { EAT_SOON_DAYS, formatPurchasedAgoShort } from "./format";
+import { EAT_SOON_RATIO, formatPurchasedAgoShort } from "./format";
 
 const MAX_ITEMS = 6;
 
@@ -66,7 +66,7 @@ export function EatSoonSummary() {
       {items.length > 0 && (
         <ul className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {items.map((item) => {
-            const eatSoon = item.daysSincePurchase >= EAT_SOON_DAYS;
+            const eatSoon = item.elapsedRatio >= EAT_SOON_RATIO;
             return (
               <li key={item.id} className="snap-start">
                 <Link

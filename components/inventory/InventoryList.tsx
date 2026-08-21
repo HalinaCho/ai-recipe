@@ -26,9 +26,9 @@ export function InventoryList() {
 
   const items = data?.items ?? [];
 
-  const handleConfirm = (item: InventoryListItem) => {
+  const handleConfirm = (item: InventoryListItem, remainingFraction: number) => {
     consume.mutate(
-      { id: item.id, consumedVia: "manual" },
+      { id: item.id, consumedVia: "manual", remainingFraction },
       { onSettled: () => setSelected(null) },
     );
   };

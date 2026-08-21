@@ -405,21 +405,55 @@ export async function consumeItemsForRecipe(
   supabase: ServerSupabaseClient,
   householdId: string,
   inventoryItemIds: string[],
+  remainingFractions: Record<string, number> = {},
 ): Promise<number> {
   if (inventoryItemIds.length === 0) return 0;
 
-  const { data, error } = await supabase
-    .from("inventory_item")
-    .update({
-      status: "consumed",
-      consumed_at: new Date().toISOString(),
-      consumed_via: "recipe_cooked",
-    })
-    .eq("household_id", householdId)
-    .eq("status", "in_stock")
-    .in("id", [...new Set(inventoryItemIds)])
-    .select("id");
+  const ids = [...new Set(inventoryItemIds)];
 
-  if (error) throw new Error(error.message);
-  return (data ?? []).length;
+  // 전량 소진(남길 비율 0)은 한 번의 update로 끝낸다 — 대부분이 이 경우다.
+  const fullyUsed = ids.filter((id) => !(remainingFractions[id] > 0));
+  const partiallyUsed = ids.filter((id) => remainingFractions[id] > 0);
+
+  let consumedCount = 0;
+
+  if (fullyUsed.length > 0) {
+    const { data, error } = await supabase
+      .from("inventory_item")
+      .update({
+        remaining_fraction: 0,
+        status: "consumed",
+        consumed_at: new Date().toISOString(),
+        consumed_via: "recipe_cooked",
+      })
+      .eq("household_id", householdId)
+      .eq("status", "in_stock")
+      .in("id", fullyUsed)
+      .select("id");
+
+    if (error) throw new Error(error.message);
+    consumedCount += (data ?? []).length;
+  }
+
+  // 일부만 쓴 항목은 남는 비율이 제각각이라 한 건씩 갱신한다.
+  // status는 in_stock 그대로여서 계속 레시피 매칭에 잡힌다 (FR-05-03).
+  for (const id of partiallyUsed) {
+    const { data, error } = await supabase
+      .from("inventory_item")
+      .update({ remaining_fraction: clampFraction(remainingFractions[id]) })
+      .eq("household_id", householdId)
+      .eq("status", "in_stock")
+      .eq("id", id)
+      .select("id");
+
+    if (error) throw new Error(error.message);
+    consumedCount += (data ?? []).length;
+  }
+
+  return consumedCount;
+}
+
+function clampFraction(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(Math.min(1, Math.max(0, value)) * 100) / 100;
 }

@@ -3,8 +3,13 @@
 import type { InventoryListItem } from "@/types/api";
 import { Chip } from "@/components/ui/Chip";
 import { IngredientIcon } from "@/components/ui/IngredientIcon";
+import { STORAGE_LABEL } from "@/lib/inventory/storage";
 import { cn } from "@/lib/utils";
-import { EAT_SOON_DAYS, formatPurchasedAgoShort } from "./format";
+import {
+  EAT_SOON_RATIO,
+  formatPurchasedAgoShort,
+  formatRemainingFraction,
+} from "./format";
 
 export interface InventoryItemRowProps {
   item: InventoryListItem;
@@ -18,7 +23,10 @@ export function InventoryItemRow({
   isOldest = false,
   onSelect,
 }: InventoryItemRowProps) {
-  const eatSoon = item.daysSincePurchase >= EAT_SOON_DAYS;
+  const eatSoon = item.elapsedRatio >= EAT_SOON_RATIO;
+  const remaining = formatRemainingFraction(item.remainingFraction);
+  const storageLabel =
+    item.storageType === "unknown" ? null : STORAGE_LABEL[item.storageType];
 
   return (
     <button
@@ -49,8 +57,20 @@ export function InventoryItemRow({
             </Chip>
           )}
         </span>
-        <span className="truncate text-label-md text-on-surface-variant">
-          {item.quantity} · {item.rawName}
+        <span className="flex items-center gap-1.5">
+          {storageLabel && (
+            <span className="shrink-0 rounded-full bg-surface-container px-2 py-0.5 text-label-sm text-on-surface-variant">
+              {storageLabel}
+            </span>
+          )}
+          {remaining && (
+            <span className="shrink-0 rounded-full bg-tertiary-container px-2 py-0.5 text-label-sm text-on-tertiary-container">
+              {remaining}
+            </span>
+          )}
+          <span className="truncate text-label-md text-on-surface-variant">
+            {item.quantity} · {item.rawName}
+          </span>
         </span>
       </span>
 

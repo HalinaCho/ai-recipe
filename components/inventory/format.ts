@@ -40,8 +40,22 @@ export function formatRelativeTime(iso: string | null): string {
 }
 
 /**
- * Items sitting around a week or more get the warm butter chip so the top of
- * the FIFO list reads as "eat me first" — an emphasis, not the old v1.2
- * three-section grouping (removed in PRD v1.3).
+ * "먼저 드세요" 강조를 붙이는 경계 (FR-04-02).
+ *
+ * 예전에는 "7일 이상"이라는 고정 일수였는데, 그러면 5일 된 냉동식품이 5일 된
+ * 상추와 똑같이 급해 보인다. 이제 보관방식별 기준일수 대비 경과율로 판단해
+ * 냉동은 늦게, 냉장은 일찍 올라온다.
  */
-export const EAT_SOON_DAYS = 7;
+export const EAT_SOON_RATIO = 0.6;
+
+/** 남은 비율 표시. 1은 굳이 "1" 이라고 쓰지 않는다. */
+export function formatRemainingFraction(fraction: number): string | null {
+  if (fraction >= 1) return null;
+  if (fraction <= 0) return null;
+  // 흔한 분수는 분수로, 나머지는 퍼센트로 — "0.33 남음"보다 "⅓ 남음"이 읽힌다.
+  if (Math.abs(fraction - 0.5) < 0.02) return "½ 남음";
+  if (Math.abs(fraction - 0.33) < 0.03) return "⅓ 남음";
+  if (Math.abs(fraction - 0.67) < 0.03) return "⅔ 남음";
+  if (Math.abs(fraction - 0.25) < 0.02) return "¼ 남음";
+  return `${Math.round(fraction * 100)}% 남음`;
+}

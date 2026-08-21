@@ -40,7 +40,12 @@ export async function PATCH(
   }
 
   try {
-    const item = await consumeItem(supabase, id, body.consumedVia);
+    const item = await consumeItem(
+      supabase,
+      id,
+      body.consumedVia,
+      body.remainingFraction ?? 0,
+    );
 
     if (!item) {
       // RLS가 다른 가구 항목을 가려주므로, 없는 항목과 이미 소진된 항목이

@@ -1,4 +1,5 @@
 import { getEffectiveSenderDomains } from "@/lib/inventory/sender-domains";
+import { inferStorageType } from "@/lib/inventory/storage";
 import type { ServerSupabaseClient } from "@/lib/inventory/types";
 import { decryptSecret } from "@/lib/crypto";
 import { createMailAdapter } from "@/lib/mail-adapters";
@@ -196,6 +197,9 @@ async function syncOneConnection(args: {
         raw_name: item.rawName,
         quantity: item.quantity,
         purchased_at: parsed.purchasedAt,
+        // FR-04-04: 상품명에 (냉장)/(냉동) 표기가 있으면 그걸 쓰고,
+        // 없으면 재료명으로 추정한다. 틀릴 수 있어 사용자가 고칠 수 있다.
+        storage_type: inferStorageType(item.rawName, item.normalizedName),
         source_mail_connection_id: connection.id,
       })),
     );
