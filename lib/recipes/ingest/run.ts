@@ -324,6 +324,8 @@ async function upsertRecipes(
           name: recipe.name,
           image_url: recipe.imageUrl,
           instructions: recipe.instructions,
+          category: recipe.category,
+          cooking_method: recipe.cookingMethod,
           calories: recipe.nutrition.calories,
           carbohydrate: recipe.nutrition.carbohydrate,
           protein: recipe.nutrition.protein,

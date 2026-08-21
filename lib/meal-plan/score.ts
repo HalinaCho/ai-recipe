@@ -11,6 +11,10 @@
 // 조미료를 분모에서 빼는 기준이 화면마다 달라지면 안 된다.
 
 import { categoryShares, resolveCategory } from "@/lib/ingredients/category";
+import {
+  outOfSeasonPurchases,
+  seasonPenaltyFactor,
+} from "@/lib/ingredients/seasonality";
 import { daysSincePurchase, todayInSeoul } from "@/lib/inventory/queries";
 import {
   DEFAULT_MEAL_PLAN_CONFIG,
@@ -44,6 +48,14 @@ export interface MealPlanScore {
   matchRate: number;
   expiringRate: number;
   diversityBonus: number;
+  /**
+   * FR-13-07 제철 감점 계수 (0~1). 1이면 감점 없음. 세 항의 합에 곱해진다.
+   * 따로 남기는 이유는 "왜 이 레시피가 밀렸는지"를 화면과 로그가 설명할 수
+   * 있어야 하기 때문이다.
+   */
+  seasonFactor: number;
+  /** 사야 하는데 지금 제철이 아닌 주재료. 보유 중인 재료는 여기 안 들어온다. */
+  outOfSeasonIngredients: string[];
   ownedMainIngredients: string[];
   /** FR-13-05 장보기 후보. */
   missingMainIngredients: string[];
@@ -123,6 +135,12 @@ export function scoreForMealPlan(
   expiringNames: ReadonlySet<string>,
   purchaseShares: ReadonlyMap<IngredientCategory, number>,
   config: MealPlanConfig = DEFAULT_MEAL_PLAN_CONFIG,
+  /**
+   * FR-13-07: 이 칸이 놓인 달 (1~12). 제철 감점에 쓴다.
+   * 넘기지 않으면 감점이 없다 — 달을 모르는 호출부(테스트·다른 화면)가
+   * 조용히 엉뚱한 달로 감점당하는 것보다 감점을 안 하는 쪽이 안전하다.
+   */
+  month?: number,
 ): MealPlanScore {
   const mainNames = mainIngredientNames(recipe);
 
@@ -146,17 +164,32 @@ export function scoreForMealPlan(
 
   // 가중치는 튜닝 대상이라 합이 1이 아닌 값이 들어올 수 있다. 점수가 1을
   // 넘거나 음수가 되면 화면(막대·퍼센트)이 깨지므로 여기서 0~1로 자른다.
-  const score = clamp01(
+  const base = clamp01(
     matchRate * config.weights.matchRate +
       expiringRate * config.weights.expiring +
       diversity * config.weights.diversity,
   );
 
+  // FR-13-07: 제철 감점은 세 항의 **가중합에 곱한다**. 네 번째 항으로 더하지
+  // 않는 이유가 있다 — 더하기로 넣으면 다른 항이 높은 레시피가 감점을 흡수해
+  // 8월 감귤이 여전히 상위에 남는다. 곱셈이면 아무리 좋은 레시피여도 제철이
+  // 아닌 재료를 사야 하는 만큼 확실히 내려간다.
+  //
+  // 제철이 아닌 **보유** 재료는 감점 대상이 아니다 (outOfSeasonPurchases 참고).
+  const seasonFactor =
+    month === undefined
+      ? 1
+      : seasonPenaltyFactor(mainNames, missing, month, config.seasonPenalty);
+  const outOfSeason =
+    month === undefined ? [] : outOfSeasonPurchases(missing, month);
+
   return {
-    score,
+    score: clamp01(base * seasonFactor),
     matchRate,
     expiringRate,
     diversityBonus: diversity,
+    seasonFactor,
+    outOfSeasonIngredients: outOfSeason,
     ownedMainIngredients: owned,
     missingMainIngredients: missing,
     usesExpiringIngredients: expiring,

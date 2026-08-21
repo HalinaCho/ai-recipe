@@ -5,6 +5,7 @@
 // 상태가 어긋나면 결과는 "그럴듯한데 틀린" 식단표가 된다. 눈으로는 못 잡는
 // 종류의 버그라, 입력을 전부 인자로 받아 값만으로 검증할 수 있어야 한다.
 
+import { monthOf } from "@/lib/ingredients/seasonality";
 import {
   DEFAULT_MEAL_PLAN_CONFIG,
   type MealPlanConfig,
@@ -110,6 +111,10 @@ export function placeWeek(input: PlaceWeekInput): PlacedSlot[] {
       matchingConfig,
     );
 
+    // FR-13-07: 제철은 칸마다 따로 본다. 한 주가 월말을 걸치면 월요일과
+    // 일요일의 달이 다르고, 그 경계에서 제철이 바뀌는 재료가 실제로 있다.
+    const month = monthOf(slot.date);
+
     const lock = input.locked?.get(slotKey(slot.date, slot.mealType));
     const lockedRecipe = lock ? byId.get(lock.recipeId) : undefined;
 
@@ -117,7 +122,15 @@ export function placeWeek(input: PlaceWeekInput): PlacedSlot[] {
     // 되돌린다. 칸을 비우는 것보다 낫다 (FR-13-03).
     const recipe =
       lockedRecipe ??
-      pickBest(recipes, usedRecipeIds, ownedNames, expiringNames, input.purchaseShares, config);
+      pickBest(
+        recipes,
+        usedRecipeIds,
+        ownedNames,
+        expiringNames,
+        input.purchaseShares,
+        config,
+        month,
+      );
 
     const score = scoreForMealPlan(
       recipe,
@@ -125,6 +138,7 @@ export function placeWeek(input: PlaceWeekInput): PlacedSlot[] {
       expiringNames,
       input.purchaseShares,
       config,
+      month,
     );
 
     const consumed = consumeOwnedMains(
@@ -165,6 +179,7 @@ function pickBest(
   expiringNames: ReadonlySet<string>,
   purchaseShares: ReadonlyMap<IngredientCategory, number>,
   config: MealPlanConfig,
+  month: number,
 ): ScorableRecipe {
   const pool = recipes.filter((recipe) => !usedRecipeIds.has(recipe.id));
   const candidates = pool.length > 0 ? pool : recipes;
@@ -179,6 +194,7 @@ function pickBest(
       expiringNames,
       purchaseShares,
       config,
+      month,
     );
     if (best === null || bestScore === null || isBetter(recipe, score, best, bestScore)) {
       best = recipe;
@@ -274,6 +290,7 @@ export function replayWeek(
       expiringNames,
       purchaseShares,
       config,
+      monthOf(entry.date),
     );
     const consumed = consumeOwnedMains(remaining, mainIngredientNames(recipe));
 

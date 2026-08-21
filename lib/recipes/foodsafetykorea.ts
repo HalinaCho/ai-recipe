@@ -20,6 +20,8 @@ export interface CookRcp01Row {
   RCP_SEQ?: string;
   RCP_NM?: string;
   RCP_PARTS_DTLS?: string;
+  RCP_PAT2?: string;
+  RCP_WAY2?: string;
   ATT_FILE_NO_MAIN?: string;
   ATT_FILE_NO_MK?: string;
   INFO_ENG?: string;
@@ -119,6 +121,8 @@ export function mapCookRcp01Row(row: CookRcp01Row): RawSourceRecipe | null {
     imageUrl: pickImageUrl(row),
     instructions: parseInstructions(row),
     ingredientsText: (row.RCP_PARTS_DTLS ?? "").trim(),
+    category: trimOrNull(row.RCP_PAT2),
+    cookingMethod: trimOrNull(row.RCP_WAY2),
     nutrition: {
       calories: toNumber(row.INFO_ENG),
       carbohydrate: toNumber(row.INFO_CAR),
@@ -127,6 +131,12 @@ export function mapCookRcp01Row(row: CookRcp01Row): RawSourceRecipe | null {
       sodium: toNumber(row.INFO_NA),
     },
   };
+}
+
+/** 빈 문자열과 "없음"을 null로 접는다 — 화면에서 빈 배지가 뜨는 걸 막는다. */
+function trimOrNull(value: string | undefined): string | null {
+  const trimmed = (value ?? "").trim();
+  return trimmed === "" ? null : trimmed;
 }
 
 /**

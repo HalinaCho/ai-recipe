@@ -197,6 +197,11 @@ export interface RecipeListItem {
   name: string;
   imageUrl: string | null;
   calories: number | null;
+  /**
+   * FR-13-06: 소스가 매긴 요리종류 (예: "반찬", "국&찌개", "후식").
+   * 화면은 이 값으로 끼니와 간식을 구분해 보여준다. 없으면 null.
+   */
+  category: string | null;
   match: RecipeMatch;
   /**
    * FR-10-01: 매칭률이 애매한 구간이면 "밀키트로 간편하게" CTA를 노출한다.
@@ -304,6 +309,12 @@ export interface MealPlanSlot {
   matchScore: number;
   /** FR-13-05: 이 칸의 장보기 후보. */
   missingMainIngredients: string[];
+  /**
+   * FR-13-07: 장보기 후보 중 지금 **제철이 아닌** 것.
+   * missingMainIngredients의 부분집합이며, 이미 갖고 있는 재료는 들어오지
+   * 않는다 — 냉장고의 감귤은 8월이어도 먹어 없애야 할 재고다.
+   */
+  outOfSeasonIngredients: string[];
   source: "auto" | "swapped" | "manual";
 }
 

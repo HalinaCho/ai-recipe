@@ -11,6 +11,12 @@ export interface ScorableRecipe {
   name: string;
   imageUrl: string | null;
   calories: number | null;
+  /**
+   * FR-13-06: 소스가 매긴 요리종류 원문 (식약처 RCP_PAT2). 레시피 탭이
+   * "후식" 배지를 붙이는 근거이자, 식단표·오늘의 추천이 간식을 빼는 기준이다.
+   * 아직 백필되지 않은 행이 있어 optional로 둔다.
+   */
+  category?: string | null;
   ingredients: {
     normalizedName: string;
     role: "main" | "seasoning";
@@ -140,6 +146,7 @@ export function toListItem(
     name: recipe.name,
     imageUrl: recipe.imageUrl,
     calories: recipe.calories,
+    category: recipe.category ?? null,
     match,
     showMealKitCta: showsMealKitCta(match, config),
   };

@@ -3,6 +3,7 @@
 
 import { listInStockItems } from "@/lib/inventory/queries";
 import type { ServerSupabaseClient } from "@/lib/inventory/types";
+import { isMealSuitable } from "@/lib/recipes/meal-suitability";
 import {
   DEFAULT_MATCHING_CONFIG,
   type MatchingConfig,
@@ -88,6 +89,7 @@ function toScorable(
     name: recipe.name,
     imageUrl: recipe.image_url,
     calories: recipe.calories,
+    category: recipe.category,
     ingredients: ingredients.map((row) => ({
       normalizedName: row.normalized_name,
       role: row.role,
@@ -252,7 +254,12 @@ export async function getOrCreateTodayRecipes(
       context.ownedNames,
     );
     const ranked = rankRecipes(
-      await fetchScorableRecipes(supabase, candidateIds),
+      // FR-13-06: 오늘의 저녁거리를 묻는 자리라 후식은 후보가 아니다.
+      // 레시피 탭 목록(buildRankedRecipeList)에는 그대로 남는다 — 거기서는
+      // 분류 배지를 붙여 구분만 하고 감추지 않는다.
+      (await fetchScorableRecipes(supabase, candidateIds)).filter((recipe) =>
+        isMealSuitable(recipe.category),
+      ),
       context.ownedNames,
       context.expiringNames,
       config,

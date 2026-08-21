@@ -174,6 +174,8 @@ export interface Database {
           protein: number | null;
           fat: number | null;
           sodium: number | null;
+          category: string | null;
+          cooking_method: string | null;
           created_at: string;
         };
         Insert: {
@@ -188,6 +190,8 @@ export interface Database {
           protein?: number | null;
           fat?: number | null;
           sodium?: number | null;
+          category?: string | null;
+          cooking_method?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["recipe"]["Insert"]>;

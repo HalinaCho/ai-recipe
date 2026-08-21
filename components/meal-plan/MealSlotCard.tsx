@@ -4,6 +4,7 @@ import type { MealPlanSlot } from "@/types/api";
 import { IngredientIcon } from "@/components/ui/IngredientIcon";
 import { MatchMeter } from "@/components/recipes/MatchMeter";
 import { formatCalories, formatMissingSummary } from "@/components/recipes/format";
+import { categoryLabel } from "@/lib/recipes/meal-suitability";
 import { formatLowMatchNote, formatMealType } from "./format";
 
 export interface MealSlotCardProps {
@@ -62,7 +63,9 @@ export function MealSlotCard({ slot, onSwap }: MealSlotCardProps) {
           </span>
           <span className="text-body-lg text-on-surface">{recipe.name}</span>
           <span className="text-label-md text-on-surface-variant">
-            {calories ?? "영양정보 없음"}
+            {[categoryLabel(recipe.category), calories ?? "영양정보 없음"]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </span>
 
@@ -91,6 +94,23 @@ export function MealSlotCard({ slot, onSwap }: MealSlotCardProps) {
           <span className="inline-flex w-fit items-center gap-1 rounded-full bg-error-container px-2.5 py-1 text-label-sm text-on-error-container">
             장보기 후보 {recipe.match.missingMainIngredients.length}개
           </span>
+          {/* FR-13-07: 제철이 아닌 것을 사러 보내면 비싸고 맛도 덜하다.
+              배치는 이미 감점됐지만, 왜 굳이 이게 남았는지는 말해줘야 한다. */}
+          {slot.outOfSeasonIngredients.length > 0 && (
+            <span className="flex items-start gap-1.5 text-label-md text-on-surface-variant">
+              <span
+                className="material-symbols-outlined text-[18px] leading-5"
+                aria-hidden
+              >
+                calendar_month
+              </span>
+              {/* 조사(은/는)를 붙이면 받침에 따라 갈라져야 해서, 재료 이름을
+                  문장에 끼우지 않고 뒤에 붙이는 형태로 쓴다. */}
+              <span>
+                지금 제철이 아니에요 · {slot.outOfSeasonIngredients.join(", ")}
+              </span>
+            </span>
+          )}
         </span>
       ) : (
         <span className="flex items-start gap-1.5 text-label-md text-on-tertiary-container">

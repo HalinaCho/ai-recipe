@@ -31,6 +31,13 @@ export interface RawSourceRecipe {
   instructions: string[];
   /** 예: RCP_PARTS_DTLS — "돼지고기 300g, 양파 1개, 간장 2큰술 ..." */
   ingredientsText: string;
+  /**
+   * 소스가 매긴 요리종류 원문 (식약처 RCP_PAT2: 반찬/일품/후식/밥/국&찌개/기타).
+   * FR-13-06의 끼니·간식 구분이 이 값에 걸려 있다. 없으면 null.
+   */
+  category: string | null;
+  /** 소스가 매긴 조리방법 원문 (식약처 RCP_WAY2). 지금은 저장만 한다. */
+  cookingMethod: string | null;
   nutrition: Recipe["nutrition"];
 }
 

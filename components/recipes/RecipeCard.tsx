@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { RecipeListItem } from "@/types/api";
 import { IngredientIcon } from "@/components/ui/IngredientIcon";
+import { categoryLabel, isSnackCategory } from "@/lib/recipes/meal-suitability";
 import { cn } from "@/lib/utils";
 import {
   formatCalories,
@@ -52,7 +53,23 @@ export function RecipeCard({ recipe, featured, className }: RecipeCardProps) {
           {featured && (
             <span className="text-label-sm text-primary">오늘의 1순위</span>
           )}
-          <h3 className="text-body-lg text-on-surface">{recipe.name}</h3>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className="text-body-lg text-on-surface">{recipe.name}</h3>
+            {/* FR-13-06: 간식을 목록에서 감추지는 않되 끼니와 헷갈리지 않게
+                한다. 후식만 눈에 띄는 배지를 주고, 나머지 분류는 조용한
+                회색으로 둔다 — 전부 강조하면 아무것도 강조되지 않는다. */}
+            {isSnackCategory(recipe.category) ? (
+              <span className="shrink-0 rounded-full bg-tertiary-container px-2 py-0.5 text-label-sm text-on-tertiary-container">
+                간식 · {categoryLabel(recipe.category)}
+              </span>
+            ) : (
+              categoryLabel(recipe.category) && (
+                <span className="shrink-0 rounded-full bg-surface-container px-2 py-0.5 text-label-sm text-on-surface-variant">
+                  {categoryLabel(recipe.category)}
+                </span>
+              )
+            )}
+          </div>
           <p className="text-label-md text-on-surface-variant">
             {formatOwnedSummary(match)}
             {calories && ` · ${calories}`}

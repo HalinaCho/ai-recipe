@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  monthOf,
+  outOfSeasonPurchases,
+} from "@/lib/ingredients/seasonality";
 import { useEffect, useState } from "react";
 import type {
   CookChecklistResponse,
@@ -233,6 +237,7 @@ function mealPlanRecipe(
   missing: string[],
   expiring: string[],
   nutrition: FixtureNutrition | null,
+  category: string | null = "반찬",
 ): MealPlanFixtureRecipe {
   const total = owned.length + missing.length;
   const matchRate = total === 0 ? 0 : owned.length / total;
@@ -242,6 +247,7 @@ function mealPlanRecipe(
       name,
       imageUrl: null,
       calories: nutrition?.calories ?? null,
+      category,
       match: {
         // 목록 점수와 식단표 점수는 원래 다르지만(가상 재고 위 계산),
         // 픽스처에선 매칭률에서 살짝 흔들어 둔 값이면 충분하다.
@@ -283,15 +289,22 @@ const MEAL_PLAN_POOL: MealPlanFixtureRecipe[] = [
   mealPlanRecipe(19, "김치볶음밥", ["김치", "밥", "계란"], [], ["김치"], { calories: 520, carbohydrate: 74, protein: 15, fat: 17, sodium: 1420 }),
   // (3) 영양정보 없음 — 세 번째.
   mealPlanRecipe(20, "가지볶음", ["가지", "양파"], [], ["가지"], null),
+  // (5) 제철 아닌 재료를 사야 하는 끼니 (FR-13-07). 감귤은 11~2월이 제철이라
+  // 나머지 여덟 달 동안 "지금 제철이 아니에요" 문구가 화면에 뜬다.
+  // 이 항목이 없으면 그 문구를 1년에 넉 달만 눈으로 볼 수 있다.
+  mealPlanRecipe(21, "감귤 콩샐러드", ["양배추"], ["감귤", "병아리콩"], [], { calories: 240, carbohydrate: 34, protein: 9, fat: 7, sodium: 260 }),
 ];
 
-/** 위험 케이스 세 개의 풀 인덱스: 해물파전(14%) · 잡채(부족 5개) · 연어(영양 없음). */
-const SHOWCASE_POOL_INDEXES = [15, 14, 4];
+/**
+ * 위험 케이스의 풀 인덱스: 해물파전(14%) · 잡채(부족 5개) · 연어(영양 없음) ·
+ * 감귤 콩샐러드(제철 아님).
+ */
+const SHOWCASE_POOL_INDEXES = [15, 14, 4, 20];
 /**
  * 그 세 개를 그 주의 몇 번째 칸에 꽂을지. 회전만 시키면 어떤 주에는 안 나와서
  * "오늘은 잘 보이네" 하고 넘어가게 된다. 매주 같은 자리에 고정해 둔다.
  */
-const SHOWCASE_SLOT_INDEXES = [2, 4, 5];
+const SHOWCASE_SLOT_INDEXES = [2, 4, 5, 6];
 
 /**
  * 픽스처 모드에서 사용자가 바꾼 칸. 백엔드가 없으니 세션 메모리에 들고 있어야
@@ -478,6 +491,12 @@ function buildFixtureWeek(weekStart: string): MealPlanSlot[] {
       recipe,
       matchScore: recipe.match.score,
       missingMainIngredients: recipe.match.missingMainIngredients,
+      // FR-13-07: 픽스처에서도 제철 경고가 실제로 어떻게 보이는지 확인할 수
+      // 있어야 한다. 부족 재료 중 이 달에 제철이 아닌 것을 그대로 계산한다.
+      outOfSeasonIngredients: outOfSeasonPurchases(
+        recipe.match.missingMainIngredients,
+        monthOf(blank.date),
+      ),
       source: swapped?.source ?? "auto",
     };
   });

@@ -35,6 +35,7 @@ import {
   DEFAULT_MATCHING_CONFIG,
   type MatchingConfig,
 } from "@/lib/recipes/matching/config";
+import { isMealSuitable } from "@/lib/recipes/meal-suitability";
 import { fetchAllPages } from "@/lib/recipes/matching/queries";
 import {
   rankRecipes,
@@ -59,7 +60,20 @@ type MealPlanEntryRow = Database["public"]["Tables"]["meal_plan_entry"]["Row"];
 /** 영양 합계(FR-14-01)까지 필요해서 ScorableRecipe에 영양 정보를 얹은 형태. */
 export interface MealPlanRecipe extends ScorableRecipe {
   nutrition: SlotNutrition;
+  /** FR-13-06: 식약처 요리종류 원문. "후식"이면 끼니 후보에서 뺀다. */
+  category: string | null;
 }
+
+/**
+ * FR-13-06: "간식이 아닌 것"을 고르는 PostgREST 조건.
+ *
+ * category가 null인 행도 통과시켜야 한다 — 백필 전이거나 다른 소스에서 온
+ * 행을 전부 떨어뜨리면 후보 풀이 비어 식단표가 빈 칸이 된다(FR-13-03 위반).
+ * 판정 기준은 lib/recipes/meal-suitability.ts와 같아야 하며, 여기는 그것을
+ * SQL로 옮겨 적은 것이다 — 앱에서 거르기 전에 DB에서 먼저 줄여야
+ * candidatePoolSize만큼 뽑았을 때 간식이 자리를 차지하지 않는다.
+ */
+const MEAL_ONLY_FILTER = "category.is.null,category.neq.후식";
 
 // ---------------------------------------------------------------------------
 // 레시피 후보 풀
@@ -74,6 +88,7 @@ function toMealPlanRecipe(
     name: row.name,
     imageUrl: row.image_url,
     calories: row.calories,
+    category: row.category,
     ingredients: ingredients.map((ingredient) => ({
       normalizedName: ingredient.normalized_name,
       role: ingredient.role,
@@ -170,6 +185,7 @@ async function fetchRecipeIdSample(
   const { data, error } = await supabase
     .from("recipe")
     .select("id")
+    .or(MEAL_ONLY_FILTER)
     .order("name", { ascending: true })
     .order("id", { ascending: true })
     .limit(limit);
@@ -260,7 +276,13 @@ export async function loadCandidatePool(
     matchingConfig,
   );
 
-  const overlapping = await fetchMealPlanRecipes(supabase, overlappingIds);
+  // FR-13-06: 재고와 겹치는 레시피라도 후식이면 끼니 후보가 아니다.
+  // fetchMealPlanRecipes는 이미 배치된 칸을 다시 읽을 때도 쓰이므로(사용자가
+  // 직접 고른 후식은 그대로 남아야 한다) 거기서 거르지 않고 여기서 거른다.
+  const overlapping = (
+    await fetchMealPlanRecipes(supabase, overlappingIds)
+  ).filter((recipe) => isMealSuitable(recipe.category));
+
   const ranked = rankRecipes(
     overlapping,
     context.ownedNames,
@@ -473,6 +495,7 @@ function buildWeek(
         // 배치 시점 점수. 저장된 값이 없으면(구버전 행) 지금 값으로 메운다.
         matchScore: row.match_score ?? slot.score.score,
         missingMainIngredients: slot.score.missingMainIngredients,
+        outOfSeasonIngredients: slot.score.outOfSeasonIngredients,
         source: slot.source,
       },
     ];

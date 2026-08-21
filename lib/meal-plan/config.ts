@@ -34,6 +34,15 @@ export interface MealPlanConfig {
    * 것도 아니고 "이번 주엔 뭘 먹을까"의 축이 아니다.
    */
   diversityCategories: readonly IngredientCategory[];
+  /**
+   * FR-13-07: 제철 감점의 세기 (0~1).
+   *
+   * 주재료 전부가 "사야 하는데 제철 아님"일 때 점수가 (1 - strength)배로
+   * 줄어든다. 0.7이면 30%만 남는다 — 대안이 하나라도 있으면 확실히 밀려나되,
+   * 후보가 마르면 배치는 되는 세기다. 완전 배제(1.0)로 두지 않는 이유는
+   * FR-13-03이 빈 칸을 금지하기 때문이다.
+   */
+  seasonPenalty: number;
   /** FR-12-02: 스왑 모달에 뿌릴 후보 개수. */
   swapCandidateCount: number;
   /**
@@ -54,6 +63,7 @@ export const DEFAULT_MEAL_PLAN_CONFIG: MealPlanConfig = {
     "grain",
     "other",
   ],
+  seasonPenalty: 0.7,
   swapCandidateCount: 20,
   candidatePoolSize: 300,
 };
