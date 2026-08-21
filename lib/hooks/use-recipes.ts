@@ -17,7 +17,7 @@ import {
   loadRecipeListFixture,
   loadTodayRecipesFixture,
 } from "./fixture-preview";
-import { INVENTORY_QUERY_KEY } from "./use-inventory";
+import { invalidateInventoryDerived } from "./use-inventory";
 
 export const RECIPES_QUERY_KEY = ["recipes"] as const;
 export const TODAY_RECIPES_QUERY_KEY = ["recipes", "today"] as const;
@@ -116,9 +116,7 @@ export function useCookRecipe(id: string) {
     },
     onSuccess: () => {
       if (isFixturePreview()) return;
-      queryClient.invalidateQueries({ queryKey: INVENTORY_QUERY_KEY });
-      // ["recipes"]는 today/detail/체크리스트 키의 접두사라 한 번에 갈린다.
-      queryClient.invalidateQueries({ queryKey: RECIPES_QUERY_KEY });
+      invalidateInventoryDerived(queryClient);
     },
   });
 }

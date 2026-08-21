@@ -1,6 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import type {
   ConsumeInventoryItemRequest,
   ConsumeInventoryItemResponse,
@@ -15,6 +20,27 @@ import { apiFetch } from "./api-client";
 import { isFixturePreview, loadInventoryFixture } from "./fixture-preview";
 
 export const INVENTORY_QUERY_KEY = ["inventory"] as const;
+
+/**
+ * 재고가 바뀌면 **재고에서 파생된 화면 전부**를 다시 받는다.
+ *
+ * 재고만 갈아 끼우면 방금 담은 재료가 재고 탭에는 뜨는데 레시피 상세는
+ * 여전히 "사야 해요"라고 하고 식단표 매칭률도 안 움직인다. 오류가 안 나고
+ * 숫자만 낡아 있어서 알아채기 어려운 종류의 버그다.
+ *
+ * 한 곳에 모아 둔 이유: 재고를 바꾸는 곳이 담기·소진·보관방식·요리함으로
+ * 네 군데인데, 각자 무효화 목록을 들고 있으면 한 곳만 빠뜨려도 같은 증상이
+ * 다시 난다. 실제로 요리함만 레시피를 갈고 식단표는 빠뜨리고 있었다.
+ */
+export function invalidateInventoryDerived(queryClient: QueryClient): void {
+  for (const queryKey of [
+    INVENTORY_QUERY_KEY,
+    ["recipes"], // today·상세·요리함 체크리스트가 모두 이 접두사 아래에 있다
+    ["meal-plan"],
+  ]) {
+    queryClient.invalidateQueries({ queryKey });
+  }
+}
 
 /**
  * GET /api/inventory — already FIFO-ordered by the server (FR-04-02), so the
@@ -87,7 +113,7 @@ export function useConsumeInventoryItem() {
     onSettled: () => {
       // In preview mode a refetch would resurrect the item from the fixture.
       if (isFixturePreview()) return;
-      queryClient.invalidateQueries({ queryKey: INVENTORY_QUERY_KEY });
+      invalidateInventoryDerived(queryClient);
     },
   });
 }
@@ -123,7 +149,8 @@ export function useCreateInventoryItem() {
       }),
     onSuccess: () => {
       // 새 항목이 경과율 순 어디에 끼는지는 서버가 정하므로 그냥 다시 받는다.
-      queryClient.invalidateQueries({ queryKey: INVENTORY_QUERY_KEY });
+      // 레시피·식단표도 함께 — 방금 담은 재료가 거기에도 반영돼야 한다.
+      invalidateInventoryDerived(queryClient);
     },
   });
 }
@@ -143,8 +170,9 @@ export function useUpdateStorageType() {
         body: JSON.stringify({ storageType } satisfies UpdateInventoryItemRequest),
       }),
     onSuccess: () => {
-      // 보관 방식이 바뀌면 경과율이 바뀌어 목록 순서도 달라진다.
-      queryClient.invalidateQueries({ queryKey: INVENTORY_QUERY_KEY });
+      // 보관 방식이 바뀌면 경과율이 바뀌고, 그 경과율은 소진임박 판정을 거쳐
+      // 레시피 추천 점수와 식단표 배치까지 흔든다.
+      invalidateInventoryDerived(queryClient);
     },
   });
 }
