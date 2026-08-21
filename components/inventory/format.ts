@@ -48,14 +48,24 @@ export function formatRelativeTime(iso: string | null): string {
  */
 export const EAT_SOON_RATIO = 0.6;
 
-/** 남은 비율 표시. 1은 굳이 "1" 이라고 쓰지 않는다. */
+/**
+ * 남은 비율을 사람 말로. 사람은 "63%"가 아니라 "반쯤"으로 어림하므로,
+ * 익숙한 분수에 가까우면 분수로 읽어준다.
+ */
+export function describeRemaining(fraction: number): string {
+  const pct = Math.round(fraction * 100);
+  if (pct <= 0) return "다 썼어요";
+  if (pct >= 100) return "그대로 있어요";
+  if (Math.abs(pct - 75) <= 2) return "¾ 남음";
+  if (Math.abs(pct - 67) <= 3) return "⅔ 남음";
+  if (Math.abs(pct - 50) <= 2) return "½ 남음";
+  if (Math.abs(pct - 33) <= 3) return "⅓ 남음";
+  if (Math.abs(pct - 25) <= 2) return "¼ 남음";
+  return `${pct}% 남음`;
+}
+
+/** 재고 카드용 짧은 표기. 미개봉·소진은 굳이 배지를 달지 않는다. */
 export function formatRemainingFraction(fraction: number): string | null {
-  if (fraction >= 1) return null;
-  if (fraction <= 0) return null;
-  // 흔한 분수는 분수로, 나머지는 퍼센트로 — "0.33 남음"보다 "⅓ 남음"이 읽힌다.
-  if (Math.abs(fraction - 0.5) < 0.02) return "½ 남음";
-  if (Math.abs(fraction - 0.33) < 0.03) return "⅓ 남음";
-  if (Math.abs(fraction - 0.67) < 0.03) return "⅔ 남음";
-  if (Math.abs(fraction - 0.25) < 0.02) return "¼ 남음";
-  return `${Math.round(fraction * 100)}% 남음`;
+  if (fraction >= 1 || fraction <= 0) return null;
+  return describeRemaining(fraction);
 }
