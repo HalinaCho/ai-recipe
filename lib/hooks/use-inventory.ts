@@ -36,6 +36,7 @@ export function invalidateInventoryDerived(queryClient: QueryClient): void {
     INVENTORY_QUERY_KEY,
     ["recipes"], // today·상세·요리함 체크리스트가 모두 이 접두사 아래에 있다
     ["meal-plan"],
+    ["shopping-list"], // 부족 재료 목록도 재고에서 나온다
   ]) {
     queryClient.invalidateQueries({ queryKey });
   }

@@ -281,6 +281,35 @@ export interface RecipeDetailResponse {
   ingredientsText: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// M4 — 장보기 리스트
+// ---------------------------------------------------------------------------
+
+/** 장보기 목록의 한 줄. 재료 하나에 그 재료를 쓰는 끼니들이 붙는다. */
+export interface ShoppingListEntry {
+  normalizedName: string;
+  /** FR-17-03: "대파 — 2개 끼니에서 사용"의 근거. 수량 합산은 하지 않는다. */
+  usedIn: {
+    recipeId: string;
+    recipeName: string;
+    date: string;
+    mealType: MealType;
+  }[];
+  /** FR-13-07: 지금 사기엔 제철이 아닌 재료. 모든 끼니에서 제철이 아닐 때만 true. */
+  outOfSeason: boolean;
+}
+
+/** GET /api/shopping-list?weekStart=YYYY-MM-DD */
+export interface ShoppingListResponse {
+  weekStartDate: string;
+  weekEndDate: string;
+  items: ShoppingListEntry[];
+  /** 이 주의 전체 끼니 수 — "10끼 중 3끼가 재료가 부족해요"를 말하려면 필요하다. */
+  totalSlots: number;
+  /** 재료가 하나라도 부족한 끼니 수. */
+  slotsNeedingShopping: number;
+}
+
 /**
  * POST /api/recipes/[id]/cook — "요리함" 처리 (FR-05-01).
  * 체크리스트에서 사용자가 실제로 쓴 재료만 골라 보낸다. 기본값은 전부 체크지만
