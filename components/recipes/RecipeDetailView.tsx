@@ -61,15 +61,19 @@ export function RecipeDetailView({ id }: { id: string }) {
 
         {data && (
           <>
-            {/* 완성 사진. 데이터는 처음부터 들어와 있었는데 화면에서 쓰지
-                않고 있었다 — 무엇을 만드는지 한눈에 보이는 게 조리법 열 줄보다
-                먼저다. 16:9로 잘라 재료 목록이 화면 밖으로 밀려나지 않게 한다. */}
+            {/* 완성 사진.
+                원본이 320×320~450×450 **정사각형**이라 16:9로 잡으면 위아래가
+                잘리고 가로로 늘어나 뭉개진다. 정사각형 그대로 두고, 원본
+                해상도를 넘겨 늘리지 않도록 폭에 상한을 건다 — 320px짜리를
+                화면 폭까지 키우면 무조건 흐려진다. */}
             <RecipeImage
               src={data.imageUrl}
               alt={`${data.name} 완성 사진`}
               fallbackName={data.name}
               size="hero"
-              className="aspect-video w-full rounded-xl bg-surface-container-low shadow-tinted"
+              width={360}
+              height={360}
+              className="mx-auto aspect-square w-full max-w-[360px] rounded-xl bg-surface-container-low shadow-tinted"
             />
 
             <header className="flex flex-col gap-3">
@@ -140,7 +144,9 @@ export function RecipeDetailView({ id }: { id: string }) {
                           alt={`${index + 1}단계`}
                           fallbackName={data.name}
                           size="step"
-                          className="aspect-video w-full rounded-lg bg-surface-container-low"
+                          width={640}
+                          height={427}
+                          className="aspect-[3/2] w-full rounded-lg bg-surface-container-low"
                         />
                       )}
                       <div className="flex gap-3">

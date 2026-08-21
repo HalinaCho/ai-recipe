@@ -10,6 +10,12 @@ export interface RecipeImageProps {
   /** 사진이 없거나 못 불러올 때 대신 띄울 재료 아이콘의 기준 이름. */
   fallbackName: string;
   className?: string;
+  /**
+   * 원본 비율. 넘기면 브라우저가 내려받기 전에 자리를 잡아 두어 사진이
+   * 뜰 때 아래 내용이 밀려 내려가지 않는다 (레이아웃 시프트).
+   */
+  width?: number;
+  height?: number;
   /** 히어로(상세 상단)인지 썸네일(목록)인지 — 폴백 아이콘 크기를 맞춘다. */
   size?: "thumb" | "hero" | "step";
 }
@@ -38,6 +44,8 @@ export function RecipeImage({
   fallbackName,
   className,
   size = "thumb",
+  width,
+  height,
 }: RecipeImageProps) {
   const [failed, setFailed] = useState(false);
 
@@ -56,6 +64,8 @@ export function RecipeImage({
     <img
       src={src}
       alt={alt}
+      width={width}
+      height={height}
       loading="lazy"
       decoding="async"
       onError={() => setFailed(true)}
