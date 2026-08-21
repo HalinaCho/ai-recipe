@@ -38,8 +38,11 @@ interface PageResult<T> {
  * 레시피는 1천 건대, 재료 행은 그 열 배쯤이라 한 번의 select로는 잘린다.
  * 잘린 걸 모르고 쓰면 "재료가 없는 레시피"가 대량으로 생겨 매칭이 조용히
  * 틀어지므로, 짧은 페이지가 나올 때까지 이어 받는다.
+ *
+ * 식단표(M3)도 같은 테이블을 같은 규모로 읽으므로 export한다 — 페이징을
+ * 각자 구현하면 한쪽만 1000행에서 조용히 잘리는 사고가 난다.
  */
-async function fetchAllPages<T>(
+export async function fetchAllPages<T>(
   runPage: (from: number, to: number) => PromiseLike<PageResult<T>>,
 ): Promise<T[]> {
   const all: T[] = [];

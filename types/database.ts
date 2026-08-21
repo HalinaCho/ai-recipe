@@ -283,6 +283,25 @@ export interface Database {
         >;
         Relationships: [];
       };
+      // 0007_meal_plan.sql — FR-11-02 특일정보 캐시. 가구와 무관한 전역 참조
+      // 데이터라 household_id가 없다.
+      public_holiday: {
+        Row: { date: string; name: string; fetched_at: string };
+        Insert: { date: string; name: string; fetched_at?: string };
+        Update: Partial<
+          Database["public"]["Tables"]["public_holiday"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      // "아직 안 받아왔다"와 "받아왔는데 공휴일이 없더라"를 구분하는 로그.
+      public_holiday_fetch_log: {
+        Row: { year_month: string; fetched_at: string };
+        Insert: { year_month: string; fetched_at?: string };
+        Update: Partial<
+          Database["public"]["Tables"]["public_holiday_fetch_log"]["Insert"]
+        >;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
