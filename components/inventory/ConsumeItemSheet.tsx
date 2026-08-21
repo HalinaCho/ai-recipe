@@ -7,6 +7,8 @@ import { IngredientIcon } from "@/components/ui/IngredientIcon";
 import { Modal } from "@/components/ui/Modal";
 import { formatPurchaseDate, formatPurchasedAgo } from "./format";
 import { RemainingPicker } from "./RemainingPicker";
+import { StorageTypePicker } from "./StorageTypePicker";
+import { useUpdateStorageType } from "@/lib/hooks/use-inventory";
 
 export interface ConsumeItemSheetProps {
   item: InventoryListItem | null;
@@ -31,6 +33,7 @@ export function ConsumeItemSheet({
 }: ConsumeItemSheetProps) {
   // 기본값은 "다 썼어요" — 요리하고 나서 여는 경우가 대부분이다.
   const [remaining, setRemaining] = useState(0);
+  const updateStorage = useUpdateStorageType();
 
   // 다른 항목을 열 때마다 선택을 초기화한다.
   useEffect(() => {
@@ -78,6 +81,21 @@ export function ConsumeItemSheet({
               ? "재고에서 빼요. 되돌릴 수 없어요."
               : "남은 만큼 재고에 그대로 둘게요."}
           </p>
+
+          {/* FR-04-05: 보관 방식 추정이 틀렸으면 여기서 바로 고친다 —
+              경과율이 달라져 목록 순서와 "먼저 드세요" 판단이 바뀐다. */}
+          <div className="flex w-full flex-col gap-2">
+            <span className="text-label-md text-on-surface-variant">
+              보관 방식
+            </span>
+            <StorageTypePicker
+              value={item.storageType}
+              disabled={pending || updateStorage.isPending}
+              onChange={(next) =>
+                updateStorage.mutate({ id: item.id, storageType: next })
+              }
+            />
+          </div>
 
           <div className="flex w-full flex-col gap-2">
             <Button

@@ -4,8 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ConsumeInventoryItemRequest,
   ConsumeInventoryItemResponse,
+  CreateInventoryItemRequest,
+  CreateInventoryItemResponse,
+  IngredientVocabularyResponse,
   InventoryListResponse,
+  UpdateInventoryItemRequest,
 } from "@/types/api";
+import type { StorageType } from "@/types/domain";
 import { apiFetch } from "./api-client";
 import { isFixturePreview, loadInventoryFixture } from "./fixture-preview";
 
@@ -82,6 +87,63 @@ export function useConsumeInventoryItem() {
     onSettled: () => {
       // In preview mode a refetch would resurrect the item from the fixture.
       if (isFixturePreview()) return;
+      queryClient.invalidateQueries({ queryKey: INVENTORY_QUERY_KEY });
+    },
+  });
+}
+
+export const INGREDIENT_VOCAB_QUERY_KEY = ["ingredients"] as const;
+
+/**
+ * GET /api/ingredients — 수동 추가 자동완성 어휘 (FR-04-07).
+ * 레시피 인입 때만 바뀌는 값이라 오래 캐시한다.
+ */
+export function useIngredientVocabulary() {
+  return useQuery<IngredientVocabularyResponse>({
+    queryKey: INGREDIENT_VOCAB_QUERY_KEY,
+    queryFn: () => apiFetch<IngredientVocabularyResponse>("/api/ingredients"),
+    staleTime: 60 * 60_000,
+    retry: 1,
+  });
+}
+
+/** POST /api/inventory — 재고 직접 추가 (FR-04-06). */
+export function useCreateInventoryItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    CreateInventoryItemResponse,
+    Error,
+    CreateInventoryItemRequest
+  >({
+    mutationFn: (input) =>
+      apiFetch<CreateInventoryItemResponse>("/api/inventory", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      // 새 항목이 경과율 순 어디에 끼는지는 서버가 정하므로 그냥 다시 받는다.
+      queryClient.invalidateQueries({ queryKey: INVENTORY_QUERY_KEY });
+    },
+  });
+}
+
+/** PATCH /api/inventory/[id] — 보관 방식 수정 (FR-04-05). */
+export function useUpdateStorageType() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    ConsumeInventoryItemResponse,
+    Error,
+    { id: string; storageType: StorageType }
+  >({
+    mutationFn: ({ id, storageType }) =>
+      apiFetch<ConsumeInventoryItemResponse>(`/api/inventory/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ storageType } satisfies UpdateInventoryItemRequest),
+      }),
+    onSuccess: () => {
+      // 보관 방식이 바뀌면 경과율이 바뀌어 목록 순서도 달라진다.
       queryClient.invalidateQueries({ queryKey: INVENTORY_QUERY_KEY });
     },
   });

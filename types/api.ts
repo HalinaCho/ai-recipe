@@ -6,7 +6,12 @@
 // screens track before the backend track has finished implementing it.
 // Do not change these shapes unilaterally.
 
-import type { Household, InventoryItem, Member } from "@/types/domain";
+import type {
+  Household,
+  InventoryItem,
+  Member,
+  StorageType,
+} from "@/types/domain";
 
 // ---------------------------------------------------------------------------
 // M0 — household
@@ -61,6 +66,45 @@ export interface ConsumeInventoryItemRequest {
 
 export interface ConsumeInventoryItemResponse {
   item: InventoryItem;
+}
+
+/**
+ * PATCH /api/inventory/[id] 로 보관 방식만 고칠 때 (FR-04-05).
+ * 추출·추정이 틀릴 수 있어 사용자가 바로잡을 수 있어야 한다.
+ */
+export interface UpdateInventoryItemRequest {
+  storageType: StorageType;
+}
+
+/**
+ * POST /api/inventory — 직접 추가 (FR-04-06).
+ * 메일 파싱이 못 잡는 마트·시장 구매를 메우는 탈출구다.
+ */
+export interface CreateInventoryItemRequest {
+  /** 레시피 어휘에서 고른 정규화된 재료명 (FR-04-07). */
+  normalizedName: string;
+  /** 자유 텍스트. 비우면 normalizedName을 그대로 쓴다. */
+  rawName?: string;
+  quantity: string;
+  /** YYYY-MM-DD. 비우면 오늘(Asia/Seoul). */
+  purchasedAt?: string;
+  storageType?: StorageType;
+}
+
+export interface CreateInventoryItemResponse {
+  item: InventoryItem;
+}
+
+/**
+ * GET /api/ingredients — 자동완성용 재료 어휘 (FR-04-07).
+ * 레시피에서 실제로 쓰이는 이름만 담기므로, 여기서 고른 재료는
+ * 레시피 매칭이 반드시 성립한다.
+ */
+export interface IngredientVocabularyResponse {
+  /** 주재료로 쓰이는 이름 — 매칭에 실제로 기여한다. */
+  main: string[];
+  /** 양념류까지 포함한 전체. 검색 폴백용. */
+  all: string[];
 }
 
 // ---------------------------------------------------------------------------

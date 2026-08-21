@@ -1,8 +1,8 @@
-import { elapsedRatio } from "@/lib/inventory/storage";
+import { elapsedRatio, inferStorageType } from "@/lib/inventory/storage";
 import type { ServerSupabaseClient } from "@/lib/inventory/types";
 import type { InventoryListItem } from "@/types/api";
 import type { Database } from "@/types/database";
-import type { InventoryItem } from "@/types/domain";
+import type { InventoryItem, StorageType } from "@/types/domain";
 
 type InventoryRow = Database["public"]["Tables"]["inventory_item"]["Row"];
 
@@ -116,6 +116,62 @@ export async function consumeItem(
     })
     .eq("id", itemId)
     .eq("status", "in_stock")
+    .select()
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? mapInventoryRow(data) : null;
+}
+
+/**
+ * FR-04-06: 재고를 직접 추가한다.
+ *
+ * 메일 파싱과 같은 테이블·같은 모양으로 넣는다 — 출처만 다를 뿐
+ * 이후 정렬·매칭·소진 처리는 완전히 동일하게 흘러야 한다.
+ * `source_mail_connection_id`가 null인 것이 수동 추가라는 유일한 표시다.
+ */
+export async function createInventoryItem(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  input: {
+    normalizedName: string;
+    rawName?: string;
+    quantity: string;
+    purchasedAt?: string;
+    storageType?: StorageType;
+  },
+): Promise<InventoryItem | null> {
+  const normalizedName = input.normalizedName.trim();
+  const rawName = input.rawName?.trim() || normalizedName;
+
+  const { data, error } = await supabase
+    .from("inventory_item")
+    .insert({
+      household_id: householdId,
+      normalized_name: normalizedName,
+      raw_name: rawName,
+      quantity: input.quantity.trim() || "1개",
+      purchased_at: input.purchasedAt || todayInSeoul(),
+      // 사용자가 안 골랐으면 메일 파싱과 같은 규칙으로 추정한다.
+      storage_type: input.storageType ?? inferStorageType(rawName, normalizedName),
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data ? mapInventoryRow(data) : null;
+}
+
+/** FR-04-05: 보관 방식만 고친다 (추정이 틀렸을 때). */
+export async function updateStorageType(
+  supabase: ServerSupabaseClient,
+  itemId: string,
+  storageType: StorageType,
+): Promise<InventoryItem | null> {
+  const { data, error } = await supabase
+    .from("inventory_item")
+    .update({ storage_type: storageType })
+    .eq("id", itemId)
     .select()
     .maybeSingle();
 

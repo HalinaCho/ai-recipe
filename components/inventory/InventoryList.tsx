@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { InventoryListItem } from "@/types/api";
 import { Card } from "@/components/ui/Card";
 import { useConsumeInventoryItem, useInventory } from "@/lib/hooks/use-inventory";
+import { AddItemSheet } from "./AddItemSheet";
+import { Button } from "@/components/ui/Button";
 import { ConsumeItemSheet } from "./ConsumeItemSheet";
 import { InventoryItemRow } from "./InventoryItemRow";
 import {
@@ -14,15 +16,17 @@ import {
 import { PreviewBadge } from "@/components/ui/PreviewBadge";
 
 /**
- * FR-04-02 / FR-05-02: one flat FIFO list (oldest purchase first, exactly as
- * the server ordered it) where tapping a row marks it consumed. PRD v1.3
- * removed the old 오늘/이번주/여유 sections, so there is deliberately no
- * grouping here.
+ * FR-04-02 / FR-05-02: 서버가 정렬해 준 순서(보관방식별 경과율) 그대로인
+ * 단일 리스트. 항목을 누르면 남은 양을 조정한다. PRD v1.3에서 오늘/이번주/여유
+ * 3섹션 구조를 걷어냈으므로 여기서 그룹을 만들지 않는다.
+ *
+ * FR-04-06: 메일이 못 잡은 재료를 직접 담는 입구도 여기에 둔다.
  */
 export function InventoryList() {
   const { data, isPending, isError, error, refetch } = useInventory();
   const consume = useConsumeInventoryItem();
   const [selected, setSelected] = useState<InventoryListItem | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const items = data?.items ?? [];
 
@@ -51,7 +55,7 @@ export function InventoryList() {
       {items.length > 0 && (
         <>
           <p className="px-1 text-label-md text-on-surface-variant">
-            오래 둔 재료가 맨 위에 있어요. 다 먹은 재료는 눌러서 정리해주세요.
+            먼저 써야 할 재료가 맨 위에 있어요. 쓴 재료는 눌러서 정리해주세요.
           </p>
           <ul className="flex flex-col gap-3">
             {items.map((item, index) => (
@@ -70,6 +74,15 @@ export function InventoryList() {
         </>
       )}
 
+      <Button
+        variant="secondary"
+        className="w-full"
+        onClick={() => setAdding(true)}
+      >
+        <span className="material-symbols-outlined text-xl">add</span>
+        재료 직접 담기
+      </Button>
+
       {consume.isError && (
         <Card className="border-2 border-error-container p-4">
           <p className="text-body-md text-on-error-container">
@@ -78,6 +91,8 @@ export function InventoryList() {
           </p>
         </Card>
       )}
+
+      <AddItemSheet open={adding} onClose={() => setAdding(false)} />
 
       <ConsumeItemSheet
         item={selected}
