@@ -152,12 +152,28 @@ export function outOfSeasonPurchases(
 }
 
 /**
+ * 하나라도 제철이 아니면 붙는 기본 감점의 몫 (0~1).
+ *
+ * 비율만으로 깎으면 재료가 많은 레시피에서 감점이 희석된다. 실제로
+ * "감귤콩샐러드"는 주재료가 8개라 감귤 하나가 제철이 아니어도 비율이 1/8뿐이라
+ * 계수가 0.88까지밖에 안 떨어졌다. 그런데 이 요리는 **감귤이 주인공**이다 —
+ * 재료 가짓수가 많다는 이유로 제철 판단이 무뎌지는 건 말이 안 된다.
+ *
+ * 그래서 감점의 절반은 "제철 아닌 걸 사야 한다"는 사실 자체에 붙이고,
+ * 나머지 절반만 비율에 비례시킨다.
+ */
+const BASE_SHARE = 0.5;
+
+/**
  * 제철 감점 계수 (0~1, 1이면 감점 없음).
  *
- * 주재료 중 **사야 하는데 제철이 아닌 것**의 비율만큼 깎는다. 완전 배제가
- * 아니라 감점인 이유는 FR-13-03 때문이다 — 빈 칸을 만들지 않으려면 후보가
- * 마르면 안 되고, 제철 아닌 것이 정말 유일한 선택지라면 배치되는 편이 낫다.
- * 다만 대안이 하나라도 있으면 확실히 밀려나도록 계수를 크게 잡는다.
+ * 완전 배제가 아니라 감점인 이유는 FR-13-03 때문이다 — 빈 칸을 만들지
+ * 않으려면 후보가 마르면 안 되고, 제철 아닌 것이 정말 유일한 선택지라면
+ * 배치되는 편이 낫다. 다만 대안이 하나라도 있으면 확실히 밀려날 만큼은 깎는다.
+ *
+ * strength 0.7 기준:
+ *   - 주재료 8개 중 1개가 제철 아님 → 계수 0.61
+ *   - 주재료 전부가 제철 아님       → 계수 0.30
  */
 export function seasonPenaltyFactor(
   mainIngredientNames: readonly string[],
@@ -168,6 +184,10 @@ export function seasonPenaltyFactor(
   if (mainIngredientNames.length === 0) return 1;
   const offenders = outOfSeasonPurchases(missingIngredients, month);
   if (offenders.length === 0) return 1;
-  const ratio = offenders.length / mainIngredientNames.length;
-  return Math.max(0, 1 - ratio * strength);
+  const ratio = Math.min(
+    1,
+    offenders.length / mainIngredientNames.length,
+  );
+  const penalty = strength * (BASE_SHARE + (1 - BASE_SHARE) * ratio);
+  return Math.max(0, 1 - penalty);
 }
