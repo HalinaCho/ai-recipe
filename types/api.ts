@@ -6,6 +6,7 @@
 // screens track before the backend track has finished implementing it.
 // Do not change these shapes unilaterally.
 
+import type { RecipeStep } from "@/lib/recipes/steps";
 import type {
   Household,
   InventoryItem,
@@ -233,7 +234,8 @@ export interface RecipeDetailResponse {
   id: string;
   name: string;
   imageUrl: string | null;
-  instructions: string[];
+  /** 조리 단계. 각 단계에 그 장면의 사진이 붙는다 (FR-06-03). */
+  instructions: RecipeStep[];
   nutrition: {
     calories: number | null;
     carbohydrate: number | null;

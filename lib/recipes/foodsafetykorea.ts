@@ -1,3 +1,4 @@
+import { toHttps, type RecipeStep } from "@/lib/recipes/steps";
 import type { RawSourceRecipe, RecipeSource } from "@/lib/recipes/types";
 
 // FR-06-01: 식약처 "조리식품의 레시피 DB"(COOKRCP01)를 1차 소스로 쓴다.
@@ -157,11 +158,12 @@ function pickImageUrl(row: CookRcp01Row): string | null {
  * 붙어 있으며, (3) 문장 끝에 이미지 대응용 알파벳 한 글자가 붙는 행이 있다.
  * 화면에서 번호는 다시 매기므로 여기서 세 가지를 모두 걷어낸다.
  */
-export function parseInstructions(row: CookRcp01Row): string[] {
-  const steps: string[] = [];
+export function parseInstructions(row: CookRcp01Row): RecipeStep[] {
+  const steps: RecipeStep[] = [];
 
   for (let i = 1; i <= 20; i += 1) {
-    const raw = row[`MANUAL${String(i).padStart(2, "0")}`];
+    const suffix = String(i).padStart(2, "0");
+    const raw = row[`MANUAL${suffix}`];
     if (typeof raw !== "string") continue;
 
     const step = raw
@@ -171,7 +173,12 @@ export function parseInstructions(row: CookRcp01Row): string[] {
       .replace(/(?<=[가-힣.)\]])\s*[a-zA-Z]$/, "")
       .trim();
 
-    if (step) steps.push(step);
+    if (!step) continue;
+
+    // 사진은 글이 있는 단계에만 붙인다. 글 없이 사진만 들어 있는 칸은 원본의
+    // 빈 슬롯이라 단계로 세면 안 된다 — 세는 순간 번호가 밀린다.
+    const image = (row[`MANUAL_IMG${suffix}`] ?? "").trim();
+    steps.push({ text: step, imageUrl: image ? toHttps(image) : null });
   }
 
   return steps;

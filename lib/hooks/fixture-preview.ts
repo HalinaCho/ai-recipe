@@ -140,10 +140,15 @@ export async function loadRecipeDetailFixture(
     id: listItem.id,
     name: listItem.name,
     imageUrl: listItem.imageUrl,
+    // 사진이 없는 단계도 화면에서 어떻게 보이는지 확인할 수 있어야 한다 —
+    // 실데이터는 100% 사진이 있지만, 다른 소스가 붙으면 빌 수 있다.
     instructions: [
-      `${listItem.match.ownedMainIngredients.join(", ") || "재료"}를 먹기 좋은 크기로 손질한다.`,
-      "달군 팬에 재료를 넣고 중불에서 볶는다.",
-      "간을 맞추고 한소끔 더 익혀 마무리한다.",
+      {
+        text: `${listItem.match.ownedMainIngredients.join(", ") || "재료"}를 먹기 좋은 크기로 손질한다.`,
+        imageUrl: null,
+      },
+      { text: "달군 팬에 재료를 넣고 중불에서 볶는다.", imageUrl: null },
+      { text: "간을 맞추고 한소끔 더 익혀 마무리한다.", imageUrl: null },
     ],
     nutrition: {
       calories: listItem.calories,

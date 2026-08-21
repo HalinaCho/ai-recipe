@@ -1,3 +1,5 @@
+import type { RecipeStep } from "@/lib/recipes/steps";
+
 // Domain types mirroring PRD.md §6. These describe the shape the app code
 // works with (camelCase); `types/database.ts` describes the raw Supabase
 // row shape (snake_case) that these are mapped from/to.
@@ -96,7 +98,8 @@ export interface Recipe {
   sourceRecipeId: string;
   name: string;
   imageUrl: string | null;
-  instructions: string[];
+  /** 조리 단계. 글과 사진이 한 쌍이다 (FR-06-03). */
+  instructions: RecipeStep[];
   // 소스에 영양정보가 없을 수 있고, DB 컬럼도 nullable이다. 없는 값을 0으로
   // 채우면 "정보 없음"과 "나트륨 0"이 구분되지 않으므로 null을 그대로 둔다.
   nutrition: {

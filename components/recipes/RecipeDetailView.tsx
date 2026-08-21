@@ -16,6 +16,7 @@ import {
 import { MatchMeter } from "./MatchMeter";
 import { MealKitBlockCta } from "./MealKitCta";
 import { MissingIngredientsBlock } from "./MissingIngredientsBlock";
+import { RecipeImage } from "./RecipeImage";
 import { RecipeIngredients } from "./RecipeIngredients";
 import { RecipeNutrition } from "./RecipeNutrition";
 import { RecipeErrorCard } from "./RecipeStates";
@@ -60,6 +61,17 @@ export function RecipeDetailView({ id }: { id: string }) {
 
         {data && (
           <>
+            {/* 완성 사진. 데이터는 처음부터 들어와 있었는데 화면에서 쓰지
+                않고 있었다 — 무엇을 만드는지 한눈에 보이는 게 조리법 열 줄보다
+                먼저다. 16:9로 잘라 재료 목록이 화면 밖으로 밀려나지 않게 한다. */}
+            <RecipeImage
+              src={data.imageUrl}
+              alt={`${data.name} 완성 사진`}
+              fallbackName={data.name}
+              size="hero"
+              className="aspect-video w-full rounded-xl bg-surface-container-low shadow-tinted"
+            />
+
             <header className="flex flex-col gap-3">
               <h2 className="text-headline-lg text-on-surface">{data.name}</h2>
               <p className="text-body-md text-on-surface-variant">
@@ -95,21 +107,36 @@ export function RecipeDetailView({ id }: { id: string }) {
             {data.instructions.length > 0 && (
               <section className="flex flex-col gap-3">
                 <h2 className="text-headline-md text-on-surface">조리법</h2>
+                {/* FR-06-03: 단계마다 그 장면의 사진을 함께 둔다. 글만 있으면
+                    "적당히 볶는다"가 어느 정도인지 알 수 없다. 사진을 글 위에
+                    두는 이유는 요리 중에는 화면을 스크롤하며 흘깃 보기 때문 —
+                    먼저 보이는 것이 그림이어야 지금 어느 단계인지 빨리 잡힌다. */}
                 <ol className="flex flex-col gap-3">
                   {data.instructions.map((step, index) => (
                     <li
                       key={index}
-                      className="flex gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-tinted"
+                      className="flex flex-col gap-3 rounded-xl bg-surface-container-lowest p-4 shadow-tinted"
                     >
-                      <span
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-container text-label-md text-on-primary-container"
-                        aria-hidden
-                      >
-                        {index + 1}
-                      </span>
-                      <p className="flex-1 text-body-lg text-on-surface">
-                        {step}
-                      </p>
+                      {step.imageUrl && (
+                        <RecipeImage
+                          src={step.imageUrl}
+                          alt={`${index + 1}단계`}
+                          fallbackName={data.name}
+                          size="step"
+                          className="aspect-video w-full rounded-lg bg-surface-container-low"
+                        />
+                      )}
+                      <div className="flex gap-3">
+                        <span
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-container text-label-md text-on-primary-container"
+                          aria-hidden
+                        >
+                          {index + 1}
+                        </span>
+                        <p className="flex-1 text-body-lg text-on-surface">
+                          {step.text}
+                        </p>
+                      </div>
                     </li>
                   ))}
                 </ol>

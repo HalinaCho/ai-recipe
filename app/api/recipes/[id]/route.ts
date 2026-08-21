@@ -1,3 +1,4 @@
+import { normalizeSteps } from "@/lib/recipes/steps";
 import { NextResponse } from "next/server";
 import { getHouseholdContext } from "@/lib/inventory/household-context";
 import { loadRecipeMatch } from "@/lib/recipes/matching/queries";
@@ -35,7 +36,8 @@ export async function GET(
       id: row.id,
       name: row.name,
       imageUrl: row.image_url,
-      instructions: row.instructions,
+      // jsonb라 옛 모양(string[])이 남아 있을 수 있다 — normalizeSteps가 흡수한다.
+      instructions: normalizeSteps(row.instructions),
       nutrition: {
         calories: row.calories,
         carbohydrate: row.carbohydrate,

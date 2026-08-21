@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { RecipeListItem } from "@/types/api";
-import { IngredientIcon } from "@/components/ui/IngredientIcon";
 import { categoryLabel, isSnackCategory } from "@/lib/recipes/meal-suitability";
 import { cn } from "@/lib/utils";
 import {
@@ -10,6 +9,7 @@ import {
   formatOwnedSummary,
 } from "./format";
 import { MatchMeter } from "./MatchMeter";
+import { RecipeImage } from "./RecipeImage";
 import { MealKitInlineCta } from "./MealKitCta";
 
 export interface RecipeCardProps {
@@ -44,10 +44,13 @@ export function RecipeCard({ recipe, featured, className }: RecipeCardProps) {
       )}
     >
       <div className="flex items-start gap-3">
-        <IngredientIcon
-          normalizedName={iconName}
-          size="md"
-          className="shrink-0 bg-surface-container-low"
+        {/* 완성 사진이 있으면 그것을, 없으면 원래 쓰던 재료 아이콘으로.
+            RecipeImage가 로딩 실패까지 흡수하므로 카드가 깨질 일은 없다. */}
+        <RecipeImage
+          src={recipe.imageUrl}
+          alt={recipe.name}
+          fallbackName={iconName}
+          className="h-14 w-14 shrink-0 rounded-xl bg-surface-container-low"
         />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           {featured && (

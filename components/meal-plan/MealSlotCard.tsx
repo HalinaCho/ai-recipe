@@ -1,7 +1,7 @@
 "use client";
 
 import type { MealPlanSlot } from "@/types/api";
-import { IngredientIcon } from "@/components/ui/IngredientIcon";
+import { RecipeImage } from "@/components/recipes/RecipeImage";
 import { MatchMeter } from "@/components/recipes/MatchMeter";
 import { formatCalories, formatMissingSummary } from "@/components/recipes/format";
 import { categoryLabel } from "@/lib/recipes/meal-suitability";
@@ -44,10 +44,11 @@ export function MealSlotCard({ slot, onSwap }: MealSlotCardProps) {
       className="flex w-full flex-col gap-3 rounded-xl bg-surface-container-lowest p-4 text-left shadow-tinted transition-all active:scale-[0.98] active:translate-y-0.5"
     >
       <div className="flex items-start gap-3">
-        <IngredientIcon
-          normalizedName={iconName}
-          size="md"
-          className="shrink-0 bg-surface-container-low"
+        <RecipeImage
+          src={recipe.imageUrl}
+          alt={recipe.name}
+          fallbackName={iconName}
+          className="h-14 w-14 shrink-0 rounded-xl bg-surface-container-low"
         />
 
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">

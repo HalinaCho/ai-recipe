@@ -3,6 +3,7 @@
 // matching track, and the screens track all build against them
 // concurrently. If a change is genuinely needed, stop and flag it.
 
+import type { RecipeStep } from "@/lib/recipes/steps";
 import type { Recipe } from "@/types/domain";
 
 /**
@@ -28,7 +29,8 @@ export interface RawSourceRecipe {
   sourceRecipeId: string;
   name: string;
   imageUrl: string | null;
-  instructions: string[];
+  /** 조리 단계. 글과 그 단계의 사진이 한 쌍이다 (FR-06-03). */
+  instructions: RecipeStep[];
   /** 예: RCP_PARTS_DTLS — "돼지고기 300g, 양파 1개, 간장 2큰술 ..." */
   ingredientsText: string;
   /**

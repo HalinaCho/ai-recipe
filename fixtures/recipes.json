@@ -4,7 +4,7 @@
     {
       "id": "aaaaaaaa-0000-4000-8000-000000000001",
       "name": "돼지고기 김치찌개",
-      "imageUrl": null,
+      "imageUrl": "https://www.foodsafetykorea.go.kr/uploadimg/20141117/20141117053454_1416213294458.jpg",
       "calories": 420,
       "showMealKitCta": false,
       "match": {
@@ -27,7 +27,7 @@
     {
       "id": "aaaaaaaa-0000-4000-8000-000000000002",
       "name": "계란말이",
-      "imageUrl": null,
+      "imageUrl": "https://www.foodsafetykorea.go.kr/uploadimg/cook/10_00028_2.png",
       "calories": 210,
       "showMealKitCta": false,
       "match": {
@@ -48,7 +48,7 @@
     {
       "id": "aaaaaaaa-0000-4000-8000-000000000003",
       "name": "연어 스테이크",
-      "imageUrl": null,
+      "imageUrl": "https://www.foodsafetykorea.go.kr/uploadimg/cook/10_00113_2.png",
       "calories": 380,
       "showMealKitCta": true,
       "match": {
@@ -133,13 +133,28 @@
   "detail": {
     "id": "aaaaaaaa-0000-4000-8000-000000000001",
     "name": "돼지고기 김치찌개",
-    "imageUrl": null,
+    "imageUrl": "https://www.foodsafetykorea.go.kr/uploadimg/20141117/20141117053454_1416213294458.jpg",
     "instructions": [
-      "돼지고기를 한입 크기로 썰어 냄비에 넣고 중불에서 볶는다.",
-      "고기 겉면이 익으면 잘 익은 김치를 넣고 함께 볶는다.",
-      "물을 붓고 센 불에서 끓인다.",
-      "두부를 도톰하게 썰어 넣고 5분 더 끓인다.",
-      "대파를 어슷 썰어 올리고 한소끔 끓여 마무리한다."
+      {
+        "text": "돼지고기를 한입 크기로 썰어 냄비에 넣고 중불에서 볶는다.",
+        "imageUrl": "https://www.foodsafetykorea.go.kr/uploadimg/cook/855-1.jpg"
+      },
+      {
+        "text": "고기 겉면이 익으면 잘 익은 김치를 넣고 함께 볶는다.",
+        "imageUrl": "https://www.foodsafetykorea.go.kr/uploadimg/cook/855-2.jpg"
+      },
+      {
+        "text": "물을 붓고 센 불에서 끓인다.",
+        "imageUrl": "https://www.foodsafetykorea.go.kr/uploadimg/cook/855-3.jpg"
+      },
+      {
+        "text": "두부를 도톰하게 썰어 넣고 5분 더 끓인다.",
+        "imageUrl": "https://www.foodsafetykorea.go.kr/uploadimg/cook/855-4.jpg"
+      },
+      {
+        "text": "대파를 어슷 썰어 올리고 한소끔 끓여 마무리한다.",
+        "imageUrl": null
+      }
     ],
     "nutrition": {
       "calories": 420,

@@ -1,3 +1,5 @@
+import type { RecipeStep } from "@/lib/recipes/steps";
+
 // Hand-written to match supabase/migrations/0001_init.sql.
 // TODO: once a live Supabase project exists, regenerate via
 // `supabase gen types typescript --project-id <id> > types/database.ts`
@@ -168,7 +170,7 @@ export interface Database {
           source_recipe_id: string;
           name: string;
           image_url: string | null;
-          instructions: string[];
+          instructions: RecipeStep[];
           calories: number | null;
           carbohydrate: number | null;
           protein: number | null;
@@ -184,7 +186,7 @@ export interface Database {
           source_recipe_id: string;
           name: string;
           image_url?: string | null;
-          instructions?: string[];
+          instructions?: RecipeStep[];
           calories?: number | null;
           carbohydrate?: number | null;
           protein?: number | null;
