@@ -25,7 +25,6 @@ import {
   purchaseCategoryShares,
   scoreForMealPlan,
   toRecipeMatch,
-  type MealPlanScore,
 } from "@/lib/meal-plan/score";
 import {
   buildWeekSlots,
@@ -47,7 +46,6 @@ import type {
   MealPlanCandidatesResponse,
   MealPlanResponse,
   MealPlanSlot,
-  RecipeListItem,
   WeeklyNutritionSummary,
 } from "@/types/api";
 import type { Database } from "@/types/database";
