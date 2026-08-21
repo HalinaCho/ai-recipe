@@ -1,22 +1,8 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { requireHousehold } from "@/lib/auth/require-household";
 
 export default async function RootPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/splash");
-  }
-
-  const { data: membership } = await supabase
-    .from("member")
-    .select("household_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  redirect(membership ? "/home" : "/household");
+  // 로그인·가구가 없으면 requireHousehold가 알맞은 곳으로 보낸다.
+  await requireHousehold();
+  redirect("/home");
 }

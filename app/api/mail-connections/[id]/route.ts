@@ -18,7 +18,7 @@ export async function DELETE(
   const context = await getHouseholdContext(supabase);
 
   if (!context) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "로그인이 풀렸어요. 다시 로그인해주세요." }, { status: 401 });
   }
 
   const { id } = await params;
