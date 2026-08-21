@@ -9,6 +9,7 @@
 import type {
   Household,
   InventoryItem,
+  MealType,
   Member,
   StorageType,
 } from "@/types/domain";
@@ -271,4 +272,107 @@ export interface CookChecklistItem {
 /** GET /api/recipes/[id]/cook — 체크리스트 조회. */
 export interface CookChecklistResponse {
   items: CookChecklistItem[];
+}
+
+// ---------------------------------------------------------------------------
+// M3 — 주간 식단표
+//
+// M3 CROSS-TRACK CONTRACT: 화면 트랙이 배치 엔진 완성 전에 이 모양을 보고
+// 먼저 작업한다. 한쪽이 임의로 바꾸지 말 것 — 바꿔야 하면 멈추고 재발행한다.
+// ---------------------------------------------------------------------------
+
+/**
+ * 식단표의 한 칸. 레시피가 반드시 채워져 있다 — FR-13-03이 매칭률이 아무리
+ * 낮아도 1위 후보를 넣으라고 못 박았기 때문에 빈 칸은 존재하지 않는다.
+ */
+export interface MealPlanSlot {
+  /** meal_plan_entry.id. 스왑(FR-12-02)·직접선택(FR-12-03)의 대상. */
+  id: string;
+  /** YYYY-MM-DD (Asia/Seoul). */
+  date: string;
+  mealType: MealType;
+  /** FR-11-02: 특일정보 API 기준. 주말은 공휴일이 아니어도 끼니가 늘어난다. */
+  isHoliday: boolean;
+  /** 공휴일일 때의 이름 (예: "광복절"). 아니면 null. */
+  holidayName: string | null;
+  recipe: RecipeListItem;
+  /**
+   * 배치 시점에 계산된 점수 (FR-13-04의 3항 공식). 목록 화면의
+   * RecipeListItem.match.score와 값이 다를 수 있다 — 식단표는 앞선 요일이
+   * 재료를 써서 줄어든 **가상 재고** 위에서 계산하기 때문이다.
+   */
+  matchScore: number;
+  /** FR-13-05: 이 칸의 장보기 후보. */
+  missingMainIngredients: string[];
+  source: "auto" | "swapped" | "manual";
+}
+
+/** FR-14-01: 주간 합계. 정보 제공 수준이며 목표치 비교는 하지 않는다. */
+export interface WeeklyNutritionSummary {
+  calories: number;
+  carbohydrate: number;
+  protein: number;
+  fat: number;
+  sodium: number;
+  /**
+   * 합계에 실제로 반영된 끼니 수 / 전체 끼니 수. 식약처 레시피 중 영양정보가
+   * 비어 있는 것이 있어서, 합계만 보여주면 "적게 먹는 주"처럼 오해된다.
+   */
+  coveredSlots: number;
+  totalSlots: number;
+}
+
+/**
+ * GET /api/meal-plan?weekStart=YYYY-MM-DD
+ *
+ * weekStart는 생략 가능하며 그때는 이번 주(월요일 시작, Asia/Seoul)를 쓴다.
+ * 해당 주의 식단표가 없으면 **조회 시점에 자동 생성**한다 (FR-12-01).
+ */
+export interface MealPlanResponse {
+  weekStartDate: string;
+  weekEndDate: string;
+  slots: MealPlanSlot[];
+  nutrition: WeeklyNutritionSummary;
+  /**
+   * 공휴일 조회가 실패해 주말 판정만으로 칸을 만든 경우 true.
+   * 화면은 이때 "공휴일 정보를 못 받아왔어요"를 조용히 알린다 — 식단표
+   * 자체는 정상 동작하므로 에러로 막지 않는다.
+   */
+  holidayLookupDegraded: boolean;
+}
+
+/** POST /api/meal-plan — 한 주 전체 재생성 (FR-12-01). */
+export interface RegenerateMealPlanRequest {
+  weekStartDate?: string;
+  /**
+   * true면 사용자가 손댄 칸(source가 swapped·manual)도 함께 갈아엎는다.
+   * 기본 false — 직접 고른 끼니가 재생성 한 번에 날아가면 안 된다.
+   */
+  includeEdited?: boolean;
+}
+
+/**
+ * GET /api/meal-plan/entries/[id]/candidates — 스왑 후보 (FR-12-02).
+ * 이미 그 주에 배치된 레시피는 빠진다 (FR-13-02).
+ */
+export interface MealPlanCandidatesResponse {
+  /** 현재 배치된 레시피. 후보 목록에는 포함되지 않는다. */
+  currentRecipeId: string;
+  candidates: RecipeListItem[];
+}
+
+/**
+ * PATCH /api/meal-plan/entries/[id] — 끼니 교체.
+ *
+ * source는 서버가 정한다: 후보 목록에서 고르면 "swapped",
+ * 검색으로 목록 밖 레시피를 고르면 "manual" (FR-12-03).
+ */
+export interface UpdateMealPlanEntryRequest {
+  recipeId: string;
+}
+
+export interface UpdateMealPlanEntryResponse {
+  slot: MealPlanSlot;
+  /** 교체로 부족 재료가 바뀌므로 주간 영양 합계도 함께 돌려준다. */
+  nutrition: WeeklyNutritionSummary;
 }

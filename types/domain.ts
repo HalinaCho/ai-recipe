@@ -63,18 +63,25 @@ export interface InventoryItem {
   consumedVia: "recipe_cooked" | "manual" | null;
 }
 
+/**
+ * 재료 대분류. FR-19의 아이콘 폴백에 쓰이고, M3에서는 FR-13-04 다양성
+ * 보너스의 집계 단위이기도 하다 — "최근에 고기만 샀으니 이번엔 생선"을
+ * 판단하려면 재료를 묶을 축이 필요하다.
+ */
+export type IngredientCategory =
+  | "vegetable"
+  | "dairy"
+  | "meat"
+  | "seafood"
+  | "grain"
+  | "seasoning"
+  | "other";
+
 export interface IngredientIconMap {
   normalizedName: string;
   visualType: "emoji" | "generated_illustration" | "category_fallback";
   assetRef: string;
-  category:
-    | "vegetable"
-    | "dairy"
-    | "meat"
-    | "seafood"
-    | "grain"
-    | "seasoning"
-    | "other";
+  category: IngredientCategory;
 }
 
 export interface RecipeIngredient {
@@ -102,9 +109,13 @@ export interface Recipe {
   ingredients: RecipeIngredient[];
 }
 
+export type MealType = "lunch" | "dinner";
+
 export interface MealPlanEntry {
+  /** meal_plan_entry.id — 스왑·직접선택(FR-12-02·03)이 지목하는 대상. */
+  id: string;
   date: string;
-  mealType: "dinner" | "lunch";
+  mealType: MealType;
   isHoliday: boolean;
   recipeId: string;
   matchScore: number;
