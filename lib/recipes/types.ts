@@ -38,8 +38,12 @@ export interface RawSourceRecipe {
    * FR-13-06의 끼니·간식 구분이 이 값에 걸려 있다. 없으면 null.
    */
   category: string | null;
-  /** 소스가 매긴 조리방법 원문 (식약처 RCP_WAY2). 지금은 저장만 한다. */
+  /** 소스가 매긴 조리방법 원문 (식약처 RCP_WAY2). */
   cookingMethod: string | null;
+  /** 나트륨 저감 조리 팁 (RCP_NA_TIP). 원본의 95%에 들어 있다. */
+  tip: string | null;
+  /** 1인분 중량(g) (INFO_WGT). 원본의 25%에만 있어 대개 null이다. */
+  servingWeight: number | null;
   nutrition: Recipe["nutrition"];
 }
 

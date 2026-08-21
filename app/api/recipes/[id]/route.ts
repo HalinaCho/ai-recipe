@@ -54,9 +54,16 @@ export async function GET(
           ingredient.is_whitelisted_seasoning ||
           isWhitelistedSeasoning(ingredient.normalized_name),
         inStock: detail.context.ownedNames.has(ingredient.normalized_name),
+        amount: ingredient.amount,
+        group: ingredient.group_name,
       })),
       match,
       showMealKitCta: showsMealKitCta(match),
+      category: row.category,
+      cookingMethod: row.cooking_method,
+      tip: row.tip,
+      servingWeight: row.serving_weight,
+      ingredientsText: row.ingredients_text,
     };
 
     return NextResponse.json(response);

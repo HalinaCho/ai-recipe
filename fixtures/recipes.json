@@ -168,43 +168,57 @@
         "normalizedName": "돼지고기",
         "role": "main",
         "isWhitelistedSeasoning": false,
-        "inStock": true
+        "inStock": true,
+        "amount": "150g(1/2컵)",
+        "group": null
       },
       {
         "normalizedName": "김치",
         "role": "main",
         "isWhitelistedSeasoning": false,
-        "inStock": true
+        "inStock": true,
+        "amount": "120g",
+        "group": null
       },
       {
         "normalizedName": "두부",
         "role": "main",
         "isWhitelistedSeasoning": false,
-        "inStock": true
+        "inStock": true,
+        "amount": "60g(1/4모)",
+        "group": null
       },
       {
         "normalizedName": "대파",
         "role": "main",
         "isWhitelistedSeasoning": false,
-        "inStock": true
+        "inStock": true,
+        "amount": "10g(1/2대)",
+        "group": "고명"
       },
       {
         "normalizedName": "고춧가루",
         "role": "seasoning",
         "isWhitelistedSeasoning": true,
-        "inStock": false
+        "inStock": false,
+        "amount": null,
+        "group": null
       },
       {
         "normalizedName": "다진마늘",
         "role": "seasoning",
         "isWhitelistedSeasoning": true,
-        "inStock": false
+        "inStock": false,
+        "amount": null,
+        "group": null
       },
       {
         "normalizedName": "국간장",
         "role": "seasoning",
         "isWhitelistedSeasoning": true,
-        "inStock": false
+        "inStock": false,
+        "amount": null,
+        "group": null
       }
     ],
     "match": {
@@ -222,7 +236,12 @@
         "대파"
       ]
     },
-    "showMealKitCta": false
+    "showMealKitCta": false,
+    "category": "국&찌개",
+    "cookingMethod": "끓이기",
+    "servingWeight": 350,
+    "tip": "소금과 간장 대신 잘 익은 김치의 신맛으로 간을 맞추면 나트륨을 크게 줄일 수 있어요. 두부는 마지막에 넣어야 부서지지 않아요.",
+    "ingredientsText": "돼지고기김치찌개\n돼지고기 150g(1/2컵), 김치 120g, 두부 60g(1/4모)\n고명 대파 10g(1/2대)\n양념 소금 1g(1/4작은술), 간장 5g(1작은술), 참기름 3g(1/2작은술)"
   },
   "cookChecklist": {
     "items": [

@@ -11,8 +11,11 @@ const ROWS = [
 /** 1인분 기준 영양정보. 값이 없는 항목은 "-"로 두고 자리는 지킨다. */
 export function RecipeNutrition({
   nutrition,
+  servingWeight = null,
 }: {
   nutrition: RecipeDetailResponse["nutrition"];
+  /** FR-06-04: 1인분 중량(g). 원본의 25%에만 있어 대개 null이다. */
+  servingWeight?: number | null;
 }) {
   const hasAny = ROWS.some((row) => nutrition[row.key] !== null);
   if (!hasAny) return null;
@@ -39,7 +42,9 @@ export function RecipeNutrition({
         })}
       </ul>
       <p className="px-1 text-label-sm text-on-surface-variant">
-        1인분 기준이에요.
+        {servingWeight
+          ? `1인분 ${servingWeight}g 기준이에요.`
+          : "1인분 기준이에요."}
       </p>
     </section>
   );

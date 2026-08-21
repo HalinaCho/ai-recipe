@@ -74,6 +74,23 @@ export function RecipeDetailView({ id }: { id: string }) {
 
             <header className="flex flex-col gap-3">
               <h2 className="text-headline-lg text-on-surface">{data.name}</h2>
+              {/* FR-06-04: 소스가 매긴 분류·조리방법. 100% 채워져 있는데
+                  화면에서 안 쓰고 있었다 — "국&찌개 · 끓이기"만 봐도 어떤
+                  음식이고 얼마나 손이 가는지 대충 잡힌다. */}
+              {(data.category || data.cookingMethod) && (
+                <div className="flex flex-wrap gap-1.5">
+                  {[data.category, data.cookingMethod]
+                    .filter((value): value is string => Boolean(value))
+                    .map((value) => (
+                      <span
+                        key={value}
+                        className="rounded-full bg-secondary-container px-2.5 py-1 text-label-sm text-on-secondary-container"
+                      >
+                        {value}
+                      </span>
+                    ))}
+                </div>
+              )}
               <p className="text-body-md text-on-surface-variant">
                 {formatOwnedSummary(data.match)}
                 {formatCalories(data.nutrition.calories) &&
@@ -143,7 +160,43 @@ export function RecipeDetailView({ id }: { id: string }) {
               </section>
             )}
 
-            <RecipeNutrition nutrition={data.nutrition} />
+            {/* FR-06-04: 나트륨 저감 조리 팁 (RCP_NA_TIP). 원본의 95%에
+                들어 있는데 통째로 안 가져오고 있었다. 조리법 다음에 두는
+                이유는 "만들 줄 알고 나서 읽는 요령"이기 때문이다. */}
+            {data.tip && (
+              <section className="flex flex-col gap-2 rounded-xl bg-tertiary-container p-4">
+                <p className="flex items-center gap-1.5 text-label-md text-on-tertiary-container">
+                  <span
+                    className="material-symbols-outlined text-[18px]"
+                    aria-hidden
+                  >
+                    lightbulb
+                  </span>
+                  건강하게 먹는 요령
+                </p>
+                <p className="text-body-md text-on-tertiary-container">
+                  {data.tip}
+                </p>
+              </section>
+            )}
+
+            <RecipeNutrition
+              nutrition={data.nutrition}
+              servingWeight={data.servingWeight}
+            />
+
+            {/* FR-07-03: 파싱이 틀렸을 때 확인할 근거. 평소엔 접어 둔다 —
+                정상 동작할 때 원문까지 보여주면 화면만 시끄럽다. */}
+            {data.ingredientsText && (
+              <details className="rounded-xl bg-surface-container-low p-4">
+                <summary className="cursor-pointer text-label-md text-on-surface-variant">
+                  원본 재료 표기 보기
+                </summary>
+                <p className="mt-2 whitespace-pre-line text-body-md text-on-surface-variant">
+                  {data.ingredientsText}
+                </p>
+              </details>
+            )}
 
             {/* 하단 탭바(약 72px) 위에 떠 있다가 끝에서 자리를 잡는다.
                 뒤 글씨가 비쳐 보이면 고장 난 것처럼 읽히므로 불투명하게 둔다. */}

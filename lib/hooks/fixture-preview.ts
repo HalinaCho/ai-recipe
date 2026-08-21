@@ -158,27 +158,39 @@ export async function loadRecipeDetailFixture(
       sodium: null,
     },
     ingredients: [
-      ...listItem.match.ownedMainIngredients.map((name) => ({
+      ...listItem.match.ownedMainIngredients.map((name, index) => ({
         normalizedName: name,
         role: "main" as const,
         isWhitelistedSeasoning: false,
         inStock: true,
+        amount: `${(index + 1) * 50}g`,
+        group: null,
       })),
-      ...listItem.match.missingMainIngredients.map((name) => ({
+      ...listItem.match.missingMainIngredients.map((name, index) => ({
         normalizedName: name,
         role: "main" as const,
         isWhitelistedSeasoning: false,
         inStock: false,
+        // 계량을 못 뽑은 재료가 화면에서 어떻게 보이는지도 확인해야 한다.
+        amount: index === 0 ? null : `${(index + 1) * 30}g`,
+        group: index === 0 ? "육수" : null,
       })),
-      ...DERIVED_SEASONINGS.map((name) => ({
+      ...DERIVED_SEASONINGS.map((name, index) => ({
         normalizedName: name,
         role: "seasoning" as const,
         isWhitelistedSeasoning: true,
         inStock: false,
+        amount: `${index + 1}작은술`,
+        group: "양념",
       })),
     ],
     match: listItem.match,
     showMealKitCta: listItem.showMealKitCta,
+    category: listItem.category,
+    cookingMethod: "볶기",
+    tip: "소금 대신 표고버섯 우린 물로 감칠맛을 내면 나트륨을 줄일 수 있어요.",
+    servingWeight: 250,
+    ingredientsText: null,
   };
 }
 

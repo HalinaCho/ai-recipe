@@ -227,6 +227,17 @@ export interface RecipeIngredientDetail {
   isWhitelistedSeasoning: boolean;
   /** 재고에 있는지 — 상세 화면의 체크 표시. */
   inStock: boolean;
+  /**
+   * FR-07-03: 원문 계량 표기를 문자 그대로 ("75g(3/4모)", "1작은술").
+   * 단위 환산은 하지 않는다(FR-05-04). 원문에서 못 뽑았으면 null.
+   */
+  amount: string | null;
+  /**
+   * FR-07-03: 원문 재료 그룹 ("육수", "고명", "고기 밑간").
+   * 원본에 그룹이 있는 레시피가 17%뿐이라 대개 null이며, null인 재료는
+   * 화면에서 한 덩어리로 묶인다.
+   */
+  group: string | null;
 }
 
 /** GET /api/recipes/[id] */
@@ -246,6 +257,18 @@ export interface RecipeDetailResponse {
   ingredients: RecipeIngredientDetail[];
   match: RecipeMatch;
   showMealKitCta: boolean;
+  /** FR-06-04: 소스가 매긴 요리종류·조리방법 ("반찬", "찌기"). */
+  category: string | null;
+  cookingMethod: string | null;
+  /** FR-06-04: 나트륨 저감 조리 팁 (RCP_NA_TIP). 원본의 95%에 있다. */
+  tip: string | null;
+  /** FR-06-04: 1인분 중량(g). 원본의 25%에만 있어 대개 null이다. */
+  servingWeight: number | null;
+  /**
+   * FR-07-03: 재료 원문 그대로. 파싱이 틀렸을 때 사용자가 확인할 수 있는
+   * 근거로 화면 맨 아래에 접어서 둔다.
+   */
+  ingredientsText: string | null;
 }
 
 /**

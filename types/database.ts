@@ -178,6 +178,9 @@ export interface Database {
           sodium: number | null;
           category: string | null;
           cooking_method: string | null;
+          ingredients_text: string | null;
+          tip: string | null;
+          serving_weight: number | null;
           created_at: string;
         };
         Insert: {
@@ -194,6 +197,9 @@ export interface Database {
           sodium?: number | null;
           category?: string | null;
           cooking_method?: string | null;
+          ingredients_text?: string | null;
+          tip?: string | null;
+          serving_weight?: number | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["recipe"]["Insert"]>;
@@ -206,6 +212,8 @@ export interface Database {
           normalized_name: string;
           role: "main" | "seasoning";
           is_whitelisted_seasoning: boolean;
+          amount: string | null;
+          group_name: string | null;
         };
         Insert: {
           id?: string;
@@ -213,6 +221,8 @@ export interface Database {
           normalized_name: string;
           role: "main" | "seasoning";
           is_whitelisted_seasoning?: boolean;
+          amount?: string | null;
+          group_name?: string | null;
         };
         Update: Partial<
           Database["public"]["Tables"]["recipe_ingredient"]["Insert"]

@@ -23,6 +23,8 @@ export interface CookRcp01Row {
   RCP_PARTS_DTLS?: string;
   RCP_PAT2?: string;
   RCP_WAY2?: string;
+  RCP_NA_TIP?: string;
+  INFO_WGT?: string;
   ATT_FILE_NO_MAIN?: string;
   ATT_FILE_NO_MK?: string;
   INFO_ENG?: string;
@@ -124,6 +126,8 @@ export function mapCookRcp01Row(row: CookRcp01Row): RawSourceRecipe | null {
     ingredientsText: (row.RCP_PARTS_DTLS ?? "").trim(),
     category: trimOrNull(row.RCP_PAT2),
     cookingMethod: trimOrNull(row.RCP_WAY2),
+    tip: trimOrNull(row.RCP_NA_TIP),
+    servingWeight: toNumber(row.INFO_WGT),
     nutrition: {
       calories: toNumber(row.INFO_ENG),
       carbohydrate: toNumber(row.INFO_CAR),
