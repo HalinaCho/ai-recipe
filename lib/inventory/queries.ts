@@ -163,14 +163,47 @@ export async function createInventoryItem(
 }
 
 /** FR-04-05: 보관 방식만 고친다 (추정이 틀렸을 때). */
-export async function updateStorageType(
+export interface InventoryItemPatch {
+  normalizedName?: string;
+  rawName?: string;
+  quantity?: string;
+  purchasedAt?: string;
+  storageType?: StorageType;
+}
+
+/**
+ * FR-04-08: 항목의 고칠 수 있는 값들을 바꾼다 (보관 방식 포함).
+ *
+ * 재료명을 고칠 수 있어야 하는 이유가 제일 크다. 메일 파싱도 수동 입력도
+ * 이름을 틀리게 남길 수 있는데(실제로 "1두부"가 들어간 적이 있다), 이름이
+ * 어긋나면 매칭이 **오류 없이 0건**이 된다. 화면에는 "맞는 레시피가 없네"로만
+ * 보여서 데이터가 틀렸다는 걸 알아챌 방법이 없다.
+ *
+ * 주어진 필드만 바꾼다 — 부분 갱신이라 안 보낸 값은 그대로 둔다.
+ */
+export async function updateInventoryItem(
   supabase: ServerSupabaseClient,
   itemId: string,
-  storageType: StorageType,
+  patch: InventoryItemPatch,
 ): Promise<InventoryItem | null> {
+  const update: Database["public"]["Tables"]["inventory_item"]["Update"] = {};
+  if (patch.normalizedName !== undefined) {
+    update.normalized_name = patch.normalizedName;
+    // rawName을 따로 안 주면 표시용 원문도 같이 맞춘다. 안 그러면 목록에는
+    // 고치기 전 이름이 그대로 남아 "고쳤는데 그대로네"로 보인다.
+    update.raw_name = patch.rawName ?? patch.normalizedName;
+  } else if (patch.rawName !== undefined) {
+    update.raw_name = patch.rawName;
+  }
+  if (patch.quantity !== undefined) update.quantity = patch.quantity;
+  if (patch.purchasedAt !== undefined) update.purchased_at = patch.purchasedAt;
+  if (patch.storageType !== undefined) update.storage_type = patch.storageType;
+
+  if (Object.keys(update).length === 0) return null;
+
   const { data, error } = await supabase
     .from("inventory_item")
-    .update({ storage_type: storageType })
+    .update(update)
     .eq("id", itemId)
     .select()
     .maybeSingle();

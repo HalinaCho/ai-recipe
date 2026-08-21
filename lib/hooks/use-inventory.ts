@@ -15,7 +15,6 @@ import type {
   InventoryListResponse,
   UpdateInventoryItemRequest,
 } from "@/types/api";
-import type { StorageType } from "@/types/domain";
 import { apiFetch } from "./api-client";
 import { isFixturePreview, loadInventoryFixture } from "./fixture-preview";
 
@@ -155,23 +154,23 @@ export function useCreateInventoryItem() {
   });
 }
 
-/** PATCH /api/inventory/[id] — 보관 방식 수정 (FR-04-05). */
-export function useUpdateStorageType() {
+/** PATCH /api/inventory/[id] — 항목 수정 (FR-04-05 보관 방식, FR-04-08 나머지). */
+export function useUpdateInventoryItem() {
   const queryClient = useQueryClient();
 
   return useMutation<
     ConsumeInventoryItemResponse,
     Error,
-    { id: string; storageType: StorageType }
+    { id: string } & UpdateInventoryItemRequest
   >({
-    mutationFn: ({ id, storageType }) =>
+    mutationFn: ({ id, ...patch }) =>
       apiFetch<ConsumeInventoryItemResponse>(`/api/inventory/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ storageType } satisfies UpdateInventoryItemRequest),
+        body: JSON.stringify(patch satisfies UpdateInventoryItemRequest),
       }),
     onSuccess: () => {
-      // 보관 방식이 바뀌면 경과율이 바뀌고, 그 경과율은 소진임박 판정을 거쳐
-      // 레시피 추천 점수와 식단표 배치까지 흔든다.
+      // 이름이 바뀌면 매칭이, 구매일·보관방식이 바뀌면 경과율을 거쳐 소진임박
+      // 판정과 식단표 배치까지 함께 움직인다.
       invalidateInventoryDerived(queryClient);
     },
   });

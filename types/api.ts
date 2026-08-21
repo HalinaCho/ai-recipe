@@ -71,11 +71,21 @@ export interface ConsumeInventoryItemResponse {
 }
 
 /**
- * PATCH /api/inventory/[id] 로 보관 방식만 고칠 때 (FR-04-05).
- * 추출·추정이 틀릴 수 있어 사용자가 바로잡을 수 있어야 한다.
+ * PATCH /api/inventory/[id] — 항목 수정 (FR-04-05 보관 방식, FR-04-08 나머지).
+ *
+ * 메일 파싱도 수동 입력도 값을 틀리게 남길 수 있는데, 특히 **재료명이 어긋나면
+ * 매칭이 오류 없이 0건**이 되어 화면에는 "맞는 레시피가 없네"로만 보인다.
+ * 자동화가 만든 데이터에는 사람이 고칠 탈출구가 있어야 한다.
+ *
+ * 보낸 필드만 바뀐다. 소진 처리(consumedVia)와는 섞어 보내지 않는다.
  */
 export interface UpdateInventoryItemRequest {
-  storageType: StorageType;
+  /** 레시피 어휘에서 고른 정규화된 재료명 (FR-04-07 자동완성 재사용). */
+  normalizedName?: string;
+  quantity?: string;
+  /** YYYY-MM-DD. 경과율이 바뀌어 목록 순서와 "먼저 드세요"까지 움직인다. */
+  purchasedAt?: string;
+  storageType?: StorageType;
 }
 
 /**
