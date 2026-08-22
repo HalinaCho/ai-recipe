@@ -108,10 +108,16 @@ async function loadRecipesFixtureFile(): Promise<RecipesFixture> {
   return fixture as unknown as RecipesFixture;
 }
 
-export async function loadRecipeListFixture(): Promise<RecipeListResponse> {
+export async function loadRecipeListFixture(
+  categories: readonly string[] = [],
+): Promise<RecipeListResponse> {
   if (fixturePreviewMode() === "empty") return { recipes: [] };
   const { recipes } = await loadRecipesFixtureFile();
-  return { recipes };
+  if (categories.length === 0) return { recipes };
+  const wanted = new Set(categories);
+  return {
+    recipes: recipes.filter((r) => wanted.has(r.category ?? "기타")),
+  };
 }
 
 /** 오늘의 추천 — 목록 상위 세 개를 그날의 큐레이션으로 본다 (FR-09-01). */

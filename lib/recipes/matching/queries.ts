@@ -235,6 +235,14 @@ export async function buildRankedRecipeList(
   householdId: string,
   limit: number,
   config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
+  /**
+   * FR-09-03: 볼 분류. 비어 있으면 전부.
+   *
+   * 화면이 아니라 여기서 거르는 이유: 목록은 매칭순 상위 limit개라, 받은 뒤에
+   * 거르면 "후식만 보기"에 서너 개만 남는다. 거르고 나서 상위 limit개를
+   * 뽑아야 어떤 분류를 골라도 목록이 제대로 찬다.
+   */
+  categories: readonly string[] = [],
 ): Promise<RecipeListItem[]> {
   const context = await loadHouseholdMatchContext(supabase, householdId, config);
   const candidateIds = await fetchCandidateRecipeIds(
@@ -242,10 +250,16 @@ export async function buildRankedRecipeList(
     context.ownedNames,
   );
 
-  const recipes =
+  const all =
     candidateIds.length > 0
       ? await fetchScorableRecipes(supabase, candidateIds)
       : await fetchRecipeSample(supabase, limit);
+
+  const wanted = new Set(categories);
+  const recipes =
+    wanted.size === 0
+      ? all
+      : all.filter((recipe) => wanted.has(recipe.category ?? "기타"));
 
   return rankRecipes(
     recipes,

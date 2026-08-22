@@ -38,3 +38,30 @@ export function categoryLabel(category: string | null | undefined): string | nul
   const trimmed = category?.trim();
   return trimmed ? trimmed : null;
 }
+
+/**
+ * FR-09-03: 레시피 탭 필터에 쓰는 분류 목록.
+ *
+ * 식약처 RCP_PAT2의 값을 그대로 쓴다 — 우리가 만든 이름으로 번역하면 DB의
+ * 값과 화면의 값이 갈라져, 필터가 조용히 0건을 내는 종류의 버그가 생긴다.
+ * 순서는 실제 건수 순(반찬 574 → 기타 37)이라 자주 쓰는 것이 앞에 온다.
+ */
+export const RECIPE_CATEGORIES = [
+  "반찬",
+  "국&찌개",
+  "일품",
+  "밥",
+  "후식",
+  "기타",
+] as const;
+
+export type RecipeCategory = (typeof RECIPE_CATEGORIES)[number];
+
+/** 알 수 없는 값이 URL로 들어와도 필터가 깨지지 않게 걸러낸다. */
+export function parseCategories(raw: string | null): string[] {
+  if (!raw) return [];
+  const known = new Set<string>(RECIPE_CATEGORIES);
+  return [...new Set(raw.split(",").map((v) => v.trim()))].filter((v) =>
+    known.has(v),
+  );
+}

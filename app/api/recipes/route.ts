@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getHouseholdContext } from "@/lib/inventory/household-context";
 import { DEFAULT_MATCHING_CONFIG } from "@/lib/recipes/matching/config";
 import { buildRankedRecipeList } from "@/lib/recipes/matching/queries";
+import { parseCategories } from "@/lib/recipes/meal-suitability";
 import { createClient } from "@/lib/supabase/server";
 import type { RecipeListResponse } from "@/types/api";
 
@@ -21,13 +22,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "로그인이 풀렸어요. 다시 로그인해주세요." }, { status: 401 });
   }
 
-  const limit = resolveLimit(new URL(request.url).searchParams.get("limit"));
+  const params = new URL(request.url).searchParams;
+  const limit = resolveLimit(params.get("limit"));
+  const categories = parseCategories(params.get("categories"));
 
   try {
     const recipes = await buildRankedRecipeList(
       supabase,
       context.householdId,
       limit,
+      undefined,
+      categories,
     );
     const response: RecipeListResponse = { recipes };
     return NextResponse.json(response);

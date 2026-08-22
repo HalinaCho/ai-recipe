@@ -31,13 +31,22 @@ export const cookChecklistQueryKey = (id: string) =>
  * GET /api/recipes — 매칭 점수 내림차순으로 서버가 이미 정렬해서 준다
  * (FR-09-02). 화면은 순서를 다시 만지지 않고 그대로 그린다.
  */
-export function useRecipes() {
+export function useRecipes(categories: readonly string[] = []) {
+  // 정렬해서 키를 만든다 — [반찬,국]과 [국,반찬]은 같은 요청인데 키가 다르면
+  // 같은 목록을 두 번 받아 온다.
+  const key = [...categories].sort().join(",");
+
   return useQuery<RecipeListResponse>({
-    queryKey: RECIPES_QUERY_KEY,
+    // ["recipes"]가 접두사로 남아야 재고 변경 시 함께 무효화된다.
+    queryKey: [...RECIPES_QUERY_KEY, "list", key],
     queryFn: () =>
       isFixturePreview()
-        ? loadRecipeListFixture()
-        : apiFetch<RecipeListResponse>("/api/recipes"),
+        ? loadRecipeListFixture(categories)
+        : apiFetch<RecipeListResponse>(
+            key === ""
+              ? "/api/recipes"
+              : `/api/recipes?categories=${encodeURIComponent(key)}`,
+          ),
     staleTime: 60_000,
     retry: 1,
   });
