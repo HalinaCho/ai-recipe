@@ -1,6 +1,10 @@
 // 매칭에 필요한 DB 접근을 한곳에 모은다. 점수 공식 자체는 score.ts에 있고
 // 여기서는 "무엇을 읽어서 넣을지"만 정한다.
 
+import {
+  canonicalIngredient,
+  expandAliases,
+} from "@/lib/ingredients/aliases";
 import { listInStockItems } from "@/lib/inventory/queries";
 import type { ServerSupabaseClient } from "@/lib/inventory/types";
 import { isMealSuitable } from "@/lib/recipes/meal-suitability";
@@ -75,7 +79,11 @@ export async function loadHouseholdMatchContext(
   const items = await listInStockItems(supabase, householdId);
   return {
     items,
-    ownedNames: new Set(items.map((item) => item.normalizedName)),
+    // FR-07-05: 대표 이름으로 모아 둔다. 레시피 재료 쪽(toScorable)도 같은
+    // 함수를 거치므로 하류는 전부 같은 이름끼리 비교하게 된다.
+    ownedNames: new Set(
+      items.map((item) => canonicalIngredient(item.normalizedName)),
+    ),
     expiringNames: selectExpiringNames(items, config),
   };
 }
@@ -91,7 +99,7 @@ function toScorable(
     calories: recipe.calories,
     category: recipe.category,
     ingredients: ingredients.map((row) => ({
-      normalizedName: row.normalized_name,
+      normalizedName: canonicalIngredient(row.normalized_name),
       role: row.role,
       isWhitelistedSeasoning: row.is_whitelisted_seasoning,
     })),
@@ -195,7 +203,8 @@ async function fetchCandidateRecipeIds(
         .from("recipe_ingredient")
         .select("recipe_id")
         .eq("role", "main")
-        .in("normalized_name", [...ownedNames])
+        // 재고에 쌀만 있어도 밥을 쓰는 레시피가 후보에 들어와야 한다.
+        .in("normalized_name", expandAliases(ownedNames))
         .order("recipe_id", { ascending: true })
         .range(from, to),
   );
@@ -435,9 +444,11 @@ export async function buildCookChecklist(
   const checklist: CookChecklistItem[] = [];
 
   for (const item of detail.context.items) {
-    if (!mainNames.has(item.normalizedName)) continue;
-    if (used.has(item.normalizedName)) continue;
-    used.add(item.normalizedName);
+    // 재고 이름도 대표 이름으로 맞춰 봐야 쌀↔밥이 체크리스트에 걸린다.
+    const canonical = canonicalIngredient(item.normalizedName);
+    if (!mainNames.has(canonical)) continue;
+    if (used.has(canonical)) continue;
+    used.add(canonical);
     checklist.push({
       inventoryItemId: item.id,
       normalizedName: item.normalizedName,

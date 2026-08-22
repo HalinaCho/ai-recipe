@@ -1,3 +1,4 @@
+import { canonicalIngredient } from "@/lib/ingredients/aliases";
 import { normalizeSteps } from "@/lib/recipes/steps";
 import { NextResponse } from "next/server";
 import { getHouseholdContext } from "@/lib/inventory/household-context";
@@ -53,7 +54,10 @@ export async function GET(
         isWhitelistedSeasoning:
           ingredient.is_whitelisted_seasoning ||
           isWhitelistedSeasoning(ingredient.normalized_name),
-        inStock: detail.context.ownedNames.has(ingredient.normalized_name),
+        // FR-07-05: ownedNames는 대표 이름으로 모여 있다 (쌀↔밥).
+        inStock: detail.context.ownedNames.has(
+          canonicalIngredient(ingredient.normalized_name),
+        ),
         amount: ingredient.amount,
         group: ingredient.group_name,
       })),

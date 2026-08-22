@@ -3,6 +3,10 @@
 // (lib/inventory/queries.ts · lib/recipes/matching/queries.ts와 같은 구조 —
 //  Supabase 클라이언트를 인자로 받아 세션/서비스롤 양쪽에서 쓸 수 있게 한다.)
 
+import {
+  canonicalIngredient,
+  expandAliases,
+} from "@/lib/ingredients/aliases";
 import { listInStockItems, todayInSeoul } from "@/lib/inventory/queries";
 import { portionsOf } from "@/lib/inventory/portions";
 import type { ServerSupabaseClient } from "@/lib/inventory/types";
@@ -94,7 +98,7 @@ function toMealPlanRecipe(
     calories: row.calories,
     category: row.category,
     ingredients: ingredients.map((ingredient) => ({
-      normalizedName: ingredient.normalized_name,
+      normalizedName: canonicalIngredient(ingredient.normalized_name),
       role: ingredient.role,
       isWhitelistedSeasoning: ingredient.is_whitelisted_seasoning,
     })),
@@ -173,7 +177,8 @@ async function fetchOverlappingRecipeIds(
         .from("recipe_ingredient")
         .select("recipe_id")
         .eq("role", "main")
-        .in("normalized_name", [...ownedNames])
+        // 재고에 쌀만 있어도 밥을 쓰는 레시피가 후보에 들어와야 한다.
+        .in("normalized_name", expandAliases(ownedNames))
         .order("recipe_id", { ascending: true })
         .range(from, to),
   );
@@ -245,10 +250,12 @@ export async function loadMealPlanContext(
     // 같은 이름을 그 수만큼 넣는 것이다 — 소진 로직은 손댈 필요가 없다.
     inventory: items.flatMap((item) =>
       Array<{ normalizedName: string }>(portionsOf(item)).fill({
-        normalizedName: item.normalizedName,
+        normalizedName: canonicalIngredient(item.normalizedName),
       }),
     ),
-    ownedNames: new Set(items.map((item) => item.normalizedName)),
+    ownedNames: new Set(
+      items.map((item) => canonicalIngredient(item.normalizedName)),
+    ),
     purchaseShares: purchaseCategoryShares(
       history.map((row) => ({
         normalizedName: row.normalized_name,
