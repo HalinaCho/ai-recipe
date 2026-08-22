@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { IngredientIcon } from "@/components/ui/IngredientIcon";
+import { suggestIngredients } from "@/lib/ingredients/suggest";
 import { cn } from "@/lib/utils";
 
 /**
@@ -21,8 +22,6 @@ export interface IngredientComboboxProps {
   disabled?: boolean;
 }
 
-const MAX_SUGGESTIONS = 8;
-
 export function IngredientCombobox({
   value,
   onChange,
@@ -31,21 +30,10 @@ export function IngredientCombobox({
 }: IngredientComboboxProps) {
   const [touched, setTouched] = useState(false);
 
-  const suggestions = useMemo(() => {
-    const query = value.trim();
-    if (!query) return [];
-    // 앞에서부터 일치하는 것을 먼저 — "파"를 치면 "파"·"파프리카"가
-    // "대파"보다 위에 오는 게 자연스럽다.
-    const starts: string[] = [];
-    const contains: string[] = [];
-    for (const option of options) {
-      if (option === query) continue;
-      if (option.startsWith(query)) starts.push(option);
-      else if (option.includes(query)) contains.push(option);
-      if (starts.length >= MAX_SUGGESTIONS) break;
-    }
-    return [...starts, ...contains].slice(0, MAX_SUGGESTIONS);
-  }, [value, options]);
+  const suggestions = useMemo(
+    () => suggestIngredients(value, options),
+    [value, options],
+  );
 
   const trimmed = value.trim();
   const isKnown = trimmed !== "" && options.includes(trimmed);
@@ -74,8 +62,12 @@ export function IngredientCombobox({
                 disabled={disabled}
                 onClick={() => onChange(option)}
                 className={cn(
-                  "flex min-h-12 items-center gap-2 rounded-full border-2 border-outline-variant bg-surface-container-lowest px-3",
-                  "text-label-md text-on-surface transition-all active:scale-[0.97] disabled:opacity-50",
+                  "flex min-h-12 items-center gap-2 rounded-full border-2 px-3",
+                  "text-label-md transition-all active:scale-[0.97] disabled:opacity-50",
+                  // 정확히 일치하는 것은 "이게 맞아요"라고 보이게 한다.
+                  option === value.trim()
+                    ? "border-primary bg-primary-container text-on-primary-container"
+                    : "border-outline-variant bg-surface-container-lowest text-on-surface",
                 )}
               >
                 <IngredientIcon normalizedName={option} size="sm" />
