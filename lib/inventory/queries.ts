@@ -1,3 +1,4 @@
+import { needsPortionCount } from "@/lib/inventory/portions";
 import { elapsedRatio, inferStorageType } from "@/lib/inventory/storage";
 import type { ServerSupabaseClient } from "@/lib/inventory/types";
 import type { InventoryListItem } from "@/types/api";
@@ -16,6 +17,7 @@ export function mapInventoryRow(row: InventoryRow): InventoryItem {
     purchasedAt: row.purchased_at,
     storageType: row.storage_type,
     remainingFraction: Number(row.remaining_fraction),
+    portionCount: row.portion_count,
     sourceMailConnectionId: row.source_mail_connection_id,
     status: row.status,
     consumedAt: row.consumed_at,
@@ -79,6 +81,7 @@ export async function listInStockItems(
         ...item,
         daysSincePurchase: days,
         elapsedRatio: elapsedRatio(days, item.storageType),
+        needsPortionCount: needsPortionCount(item.quantity, item.portionCount),
       };
     })
     .sort((a, b) => {
@@ -137,6 +140,7 @@ export async function createInventoryItem(
     normalizedName: string;
     rawName?: string;
     quantity: string;
+    portionCount?: number;
     purchasedAt?: string;
     storageType?: StorageType;
   },
@@ -151,6 +155,7 @@ export async function createInventoryItem(
       normalized_name: normalizedName,
       raw_name: rawName,
       quantity: input.quantity.trim() || "1개",
+      portion_count: input.portionCount ?? null,
       purchased_at: input.purchasedAt || todayInSeoul(),
       // 사용자가 안 골랐으면 메일 파싱과 같은 규칙으로 추정한다.
       storage_type: input.storageType ?? inferStorageType(rawName, normalizedName),
@@ -164,6 +169,7 @@ export async function createInventoryItem(
 
 /** FR-04-05: 보관 방식만 고친다 (추정이 틀렸을 때). */
 export interface InventoryItemPatch {
+  portionCount?: number;
   normalizedName?: string;
   rawName?: string;
   quantity?: string;
@@ -198,6 +204,7 @@ export async function updateInventoryItem(
   if (patch.quantity !== undefined) update.quantity = patch.quantity;
   if (patch.purchasedAt !== undefined) update.purchased_at = patch.purchasedAt;
   if (patch.storageType !== undefined) update.storage_type = patch.storageType;
+  if (patch.portionCount !== undefined) update.portion_count = patch.portionCount;
 
   if (Object.keys(update).length === 0) return null;
 

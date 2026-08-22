@@ -4,6 +4,7 @@
 //  Supabase 클라이언트를 인자로 받아 세션/서비스롤 양쪽에서 쓸 수 있게 한다.)
 
 import { listInStockItems, todayInSeoul } from "@/lib/inventory/queries";
+import { portionsOf } from "@/lib/inventory/portions";
 import type { ServerSupabaseClient } from "@/lib/inventory/types";
 import {
   DEFAULT_MEAL_PLAN_CONFIG,
@@ -239,7 +240,14 @@ export async function loadMealPlanContext(
   );
 
   return {
-    inventory: items.map((item) => ({ normalizedName: item.normalizedName })),
+    // FR-04-09: 한 행이 여러 끼분이면 그만큼 펼친다. 가상 재고의 한 칸이
+    // "한 끼에 한 번 쓸 수 있는 몫"이라, 개수를 반영하는 가장 단순한 방법이
+    // 같은 이름을 그 수만큼 넣는 것이다 — 소진 로직은 손댈 필요가 없다.
+    inventory: items.flatMap((item) =>
+      Array<{ normalizedName: string }>(portionsOf(item)).fill({
+        normalizedName: item.normalizedName,
+      }),
+    ),
     ownedNames: new Set(items.map((item) => item.normalizedName)),
     purchaseShares: purchaseCategoryShares(
       history.map((row) => ({

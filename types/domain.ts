@@ -59,6 +59,11 @@ export interface InventoryItem {
   storageType: StorageType;
   /** 1 = 미개봉, 0.5 = 반 남음, 0 = 소진 (FR-05-03). 단위 환산은 하지 않는다. */
   remainingFraction: number;
+  /**
+   * FR-04-09: 이 한 행이 몇 끼분인지. 사용자가 직접 입력한다.
+   * null = 아직 안 물어봤거나 물어볼 필요가 없는 표기 → 1끼분으로 본다.
+   */
+  portionCount: number | null;
   sourceMailConnectionId: string | null;
   status: "in_stock" | "consumed";
   consumedAt: string | null;

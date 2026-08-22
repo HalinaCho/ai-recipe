@@ -52,6 +52,14 @@ export function buildInventoryPatch(
     patch.quantity = quantity || "1개";
   }
 
+  if (body.portionCount !== undefined) {
+    const count = Number(body.portionCount);
+    if (!Number.isInteger(count) || count < 1 || count > 50) {
+      return new Error("개수는 1~50 사이의 숫자여야 합니다");
+    }
+    patch.portionCount = count;
+  }
+
   if (body.purchasedAt !== undefined) {
     const date = String(body.purchasedAt).trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) {

@@ -99,6 +99,7 @@ export interface Database {
           purchased_at: string;
           storage_type: "refrigerated" | "frozen" | "room_temp" | "unknown";
           remaining_fraction: number;
+          portion_count: number | null;
           source_mail_connection_id: string | null;
           status: "in_stock" | "consumed";
           consumed_at: string | null;
@@ -114,6 +115,7 @@ export interface Database {
           purchased_at: string;
           storage_type?: "refrigerated" | "frozen" | "room_temp" | "unknown";
           remaining_fraction?: number;
+          portion_count?: number | null;
           source_mail_connection_id?: string | null;
           status?: "in_stock" | "consumed";
           consumed_at?: string | null;

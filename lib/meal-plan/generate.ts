@@ -150,9 +150,17 @@ export function placeWeek(input: PlaceWeekInput): PlacedDish[] {
 
   // FR-13-10: 간편식을 넣을 끼니를 미리 정한다. 고르게 흩뿌려야 "요리 안 하는
   // 주"로 보이지 않고, 같은 국을 이틀 연속 먹는 일도 없다.
+  //
+  // FR-13-11: 재고가 모자라면 간편식을 늘린다. 재고 칸이 끼니 수에도 못 미치면
+  // 뒤쪽이 전부 0%로 깔리는데, 만들 수도 없는 요리를 줄줄이 늘어놓는 것보다
+  // "사두면 편한 것"을 더 제안하는 편이 실제로 도움이 된다.
   const conveniencePicks = pickConvenienceSlots(
     input.slots.length,
-    config.convenienceMealsPerWeek,
+    convenienceCountFor(
+      input.slots.length,
+      input.inventory.length,
+      config,
+    ),
     input.weekSeed ?? 0,
   );
 
@@ -295,6 +303,27 @@ export function placeWeek(input: PlaceWeekInput): PlacedDish[] {
   }
 
   return placed;
+}
+
+/**
+ * 이번 주에 넣을 간편식 수.
+ *
+ * 재고 칸이 끼니 수의 절반에도 못 미치면 "만들 재료가 거의 없는 주"다.
+ * 그런 주에 직접 만드는 요리를 가득 채우면 0%짜리 나열이 되는데, 그건
+ * 식단표라기보다 못 만드는 것들의 목록이다.
+ */
+function convenienceCountFor(
+  slotCount: number,
+  inventorySlots: number,
+  config: MealPlanConfig,
+): number {
+  const base = config.convenienceMealsPerWeek;
+  // 0은 "끈다"는 뜻이다. 재고가 모자라도 켜지면 안 된다 — 설정을 0으로 둔
+  // 호출부(테스트·실험)가 조용히 간편식을 받게 된다.
+  if (base <= 0) return 0;
+  if (slotCount === 0) return base;
+  if (inventorySlots >= slotCount) return base;
+  return Math.min(config.convenienceMealsMax, base + 2);
 }
 
 /**

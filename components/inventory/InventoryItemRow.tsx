@@ -63,6 +63,13 @@ export function InventoryItemRow({
               {storageLabel}
             </span>
           )}
+          {/* FR-04-09: "1망"처럼 개수를 알 수 없는 표기. 이걸 안 물어보면
+              한 망을 한 끼에 다 썼다고 치게 되어 뒤쪽 식단이 통째로 빈다. */}
+          {item.needsPortionCount && (
+            <span className="shrink-0 rounded-full bg-primary-container px-2 py-0.5 text-label-sm text-on-primary-container">
+              개수 알려주세요
+            </span>
+          )}
           {remaining && (
             <span className="shrink-0 rounded-full bg-tertiary-container px-2 py-0.5 text-label-sm text-on-tertiary-container">
               {remaining}

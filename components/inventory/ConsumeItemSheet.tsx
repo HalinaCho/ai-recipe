@@ -43,6 +43,7 @@ export function ConsumeItemSheet({
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [purchasedAt, setPurchasedAt] = useState("");
+  const [portionCount, setPortionCount] = useState("");
 
   const vocabulary = useIngredientVocabulary();
   const update = useUpdateInventoryItem();
@@ -55,6 +56,7 @@ export function ConsumeItemSheet({
     setName(item.normalizedName);
     setQuantity(item.quantity);
     setPurchasedAt(item.purchasedAt);
+    setPortionCount(item.portionCount === null ? "" : String(item.portionCount));
     update.reset();
     // update는 매 렌더 새 객체라 의존성에 넣으면 무한 루프가 된다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,6 +81,9 @@ export function ConsumeItemSheet({
         normalizedName: name.trim(),
         quantity: quantity.trim() || "1개",
         purchasedAt,
+        ...(portionCount.trim() === ""
+          ? {}
+          : { portionCount: Number(portionCount) }),
       },
       { onSuccess: () => setEditing(false) },
     );
@@ -124,6 +129,31 @@ export function ConsumeItemSheet({
                 onChange={(event) => setQuantity(event.target.value)}
                 placeholder="예: 1봉, 500g, 2개"
               />
+            </div>
+
+            {/* FR-04-09: 몇 끼분인지. "1망"·"1봉"은 개수가 천차만별이라
+                우리가 추측할 수 없고, 모르면 1끼분으로 봐서 식단표가 빈다. */}
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="edit-portion-count"
+                className="text-label-md text-on-surface-variant"
+              >
+                몇 끼에 나눠 쓸 수 있나요? (선택)
+              </label>
+              <Input
+                id="edit-portion-count"
+                type="number"
+                min={1}
+                max={50}
+                inputMode="numeric"
+                value={portionCount}
+                disabled={update.isPending}
+                onChange={(event) => setPortionCount(event.target.value)}
+                placeholder="예: 양파 1망이면 6"
+              />
+              <span className="text-label-sm text-on-surface-variant">
+                비워두면 한 끼분으로 봐요.
+              </span>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -201,6 +231,13 @@ export function ConsumeItemSheet({
                 {formatPurchasedAgo(item.daysSincePurchase)}
               </p>
             </div>
+
+            {item.needsPortionCount && (
+              <p className="w-full rounded-xl bg-primary-container px-4 py-3 text-label-md text-on-primary-container">
+                {item.quantity}에 몇 개가 들었나요? 알려주시면 며칠에 나눠 쓸지
+                맞게 계산해요.
+              </p>
+            )}
 
             {/* FR-04-08: 메일 파싱도 수동 입력도 값을 틀리게 남길 수 있다.
                 이름이 어긋나면 매칭이 오류 없이 0건이 되므로, 고칠 길이

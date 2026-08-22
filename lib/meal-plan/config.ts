@@ -78,6 +78,14 @@ export interface MealPlanConfig {
    * 바쁜 날 두 번은 데우기만 하면 되는 여지가 생긴다.
    */
   convenienceMealsPerWeek: number;
+  /**
+   * FR-13-11: 재고가 모자랄 때 간편식을 몇 끼까지 늘릴지.
+   *
+   * 재고가 적으면 뒤쪽 끼니가 전부 0%로 깔린다. 만들 수도 없는 요리를 줄줄이
+   * 늘어놓는 것보다, "이런 걸 사두면 편해요"를 늘리는 편이 실제로 도움이 된다 —
+   * 어차피 장을 봐야 하는 상황이고, 그게 이 서비스가 하려는 일이다.
+   */
+  convenienceMealsMax: number;
   /** FR-12-02: 스왑 모달에 뿌릴 후보 개수. */
   swapCandidateCount: number;
   /**
@@ -103,6 +111,7 @@ export const DEFAULT_MEAL_PLAN_CONFIG: MealPlanConfig = {
   repeatThreshold: 2,
   repeatPenalty: 0.7,
   convenienceMealsPerWeek: 2,
+  convenienceMealsMax: 4,
   swapCandidateCount: 20,
   candidatePoolSize: 300,
 };

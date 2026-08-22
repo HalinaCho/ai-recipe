@@ -46,6 +46,11 @@ export interface InventoryListItem extends InventoryItem {
    * 정렬 기준이자, 화면이 "먼저 드세요"를 어디까지 붙일지 판단하는 근거다.
    */
   elapsedRatio: number;
+  /**
+   * FR-04-09: 개수를 물어봐야 하는 항목인가. "1망"·"1봉"처럼 개수가
+   * 천차만별인 표기라 우리가 추측할 수 없을 때 true. 화면이 배지를 띄운다.
+   */
+  needsPortionCount: boolean;
 }
 
 /** GET /api/inventory — in-stock items, oldest purchase first. */
@@ -87,6 +92,8 @@ export interface UpdateInventoryItemRequest {
   /** YYYY-MM-DD. 경과율이 바뀌어 목록 순서와 "먼저 드세요"까지 움직인다. */
   purchasedAt?: string;
   storageType?: StorageType;
+  /** FR-04-09: 이 한 행이 몇 끼분인지 (1~50). */
+  portionCount?: number;
 }
 
 /**
@@ -102,6 +109,8 @@ export interface CreateInventoryItemRequest {
   /** YYYY-MM-DD. 비우면 오늘(Asia/Seoul). */
   purchasedAt?: string;
   storageType?: StorageType;
+  /** FR-04-09: 몇 끼분인지. 생략하면 물어본다. */
+  portionCount?: number;
 }
 
 export interface CreateInventoryItemResponse {
