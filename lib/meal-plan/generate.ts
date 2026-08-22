@@ -14,6 +14,10 @@ import {
   type MealPlanConfig,
 } from "@/lib/meal-plan/config";
 import { dishRoleOf, remainingRoles } from "@/lib/meal-plan/composition";
+import {
+  pickConvenienceSlots,
+  type ConvenienceItem,
+} from "@/lib/meal-plan/convenience";
 import { scoreForMealPlan, type MealPlanScore } from "@/lib/meal-plan/score";
 import type { PlannedSlot } from "@/lib/meal-plan/slots";
 import {
@@ -46,7 +50,10 @@ export interface LockedDish {
 /** 배치가 끝난 요리 하나. meal_plan_entry 한 행에 대응한다. */
 export interface PlacedDish extends PlannedSlot {
   role: MealPlanDishRole;
-  recipe: ScorableRecipe;
+  /** 간편식이면 null — 레시피가 아니라 장바구니 후보다 (FR-13-10). */
+  recipe: ScorableRecipe | null;
+  /** 간편식일 때만 채워진다. */
+  convenience: ConvenienceItem | null;
   score: MealPlanScore;
   source: "auto" | "swapped" | "manual";
   /**
@@ -58,6 +65,27 @@ export interface PlacedDish extends PlannedSlot {
   /** 이 요리가 가상 재고에서 덜어낸 주재료. */
   consumed: string[];
 }
+
+/**
+ * 간편식 자리의 점수. 재료를 안 쓰므로 매칭이랄 게 없다.
+ *
+ * 0으로 두는 게 맞는 이유: 화면의 매칭 막대는 "우리 재고로 얼마나 되는가"를
+ * 말하는데 간편식은 사 오는 것이라 그 축에 없다. 억지로 100%를 주면
+ * "있는 재료로 만들 수 있다"는 뜻이 되어 거짓말이 된다. 화면은 간편식일 때
+ * 막대 대신 다른 표시를 쓴다.
+ */
+const EMPTY_SCORE: MealPlanScore = {
+  score: 0,
+  matchRate: 0,
+  expiringRate: 0,
+  diversityBonus: 0,
+  seasonFactor: 1,
+  repeatFactor: 1,
+  outOfSeasonIngredients: [],
+  ownedMainIngredients: [],
+  missingMainIngredients: [],
+  usesExpiringIngredients: [],
+};
 
 /** `${date}|${mealType}` — 끼니를 가리키는 키. */
 export function slotKey(date: string, mealType: MealType): string {
@@ -75,6 +103,8 @@ export interface PlaceWeekInput {
   purchaseShares: ReadonlyMap<IngredientCategory, number>;
   /** 보존할 요리들. slotKey → 그 끼니에서 유지할 요리 목록. */
   locked?: ReadonlyMap<string, readonly LockedDish[]>;
+  /** FR-13-10: 간편식을 어느 끼니에 넣을지 정하는 씨앗. 주차를 넣는다. */
+  weekSeed?: number;
   config?: MealPlanConfig;
   matchingConfig?: MatchingConfig;
 }
@@ -111,8 +141,22 @@ export function placeWeek(input: PlaceWeekInput): PlacedDish[] {
   const remaining = input.inventory.map((entry) => entry.normalizedName);
   const usedRecipeIds = new Set<string>();
   const placed: PlacedDish[] = [];
+  // FR-13-09: 이번 주에 각 재료가 몇 번 쓰였는지. 보유 여부와 무관하게
+  // **레시피가 요구한 횟수**를 센다 — 없어서 못 쓴 재료도 계속 장보기 목록에
+  // 오르면 쏠리는 건 마찬가지다.
+  const usageCounts = new Map<string, number>();
+  const mainsOf = (recipe: ScorableRecipe) =>
+    mainsById.get(recipe.id) ?? mainIngredientNames(recipe);
 
-  for (const slot of input.slots) {
+  // FR-13-10: 간편식을 넣을 끼니를 미리 정한다. 고르게 흩뿌려야 "요리 안 하는
+  // 주"로 보이지 않고, 같은 국을 이틀 연속 먹는 일도 없다.
+  const conveniencePicks = pickConvenienceSlots(
+    input.slots.length,
+    config.convenienceMealsPerWeek,
+    input.weekSeed ?? 0,
+  );
+
+  for (const [slotIndex, slot] of input.slots.entries()) {
     // FR-13-07: 제철은 끼니마다 따로 본다. 한 주가 월말을 걸치면 월요일과
     // 일요일의 달이 다르고, 그 경계에서 제철이 바뀌는 재료가 실제로 있다.
     const month = monthOf(slot.date);
@@ -141,14 +185,32 @@ export function placeWeek(input: PlaceWeekInput): PlacedDish[] {
         mainsById.get(recipe.id) ?? mainIngredientNames(recipe),
       );
       usedRecipeIds.add(recipe.id);
+      for (const name of mainsById.get(recipe.id) ?? []) {
+        usageCounts.set(name, (usageCounts.get(name) ?? 0) + 1);
+      }
       placed.push({
         ...slot,
         role,
         recipe,
+        convenience: null,
         score,
         source,
         availableBefore: [...ownedNames],
         consumed,
+      });
+    };
+
+    // 간편식은 재료를 쓰지 않는다 — 사서 데우기만 하므로 가상 재고도 그대로다.
+    const emitConvenience = (item: ConvenienceItem) => {
+      placed.push({
+        ...slot,
+        role: "convenience",
+        recipe: null,
+        convenience: item,
+        score: EMPTY_SCORE,
+        source: "auto",
+        availableBefore: [...new Set(remaining)],
+        consumed: [],
       });
     };
 
@@ -164,6 +226,32 @@ export function placeWeek(input: PlaceWeekInput): PlacedDish[] {
 
     // 남은 자리를 채운다. 보존된 요리가 하나도 없으면 첫 요리를 먼저 골라
     // 그 분류에 따라 상차림을 정한다.
+    // FR-13-10: 이 끼니가 간편식 자리면 국 대신 간편식을 놓고 반찬만 붙인다.
+    // 국을 사두면 반찬만 만들면 되는 실제 저녁 모습이다.
+    const convenience = conveniencePicks.get(slotIndex);
+    if (convenience && restoredRoles.length === 0) {
+      emitConvenience(convenience);
+      for (const role of Array<MealPlanDishRole>(config.sidesPerMeal).fill(
+        "side",
+      )) {
+        const side = pickBestForRole(
+          recipes,
+          usedRecipeIds,
+          remaining,
+          input.purchaseShares,
+          config,
+          matchingConfig,
+          month,
+          role,
+          usageCounts,
+          mainsOf,
+        );
+        if (!side) continue;
+        emit(side, role, "auto");
+      }
+      continue;
+    }
+
     let roles: MealPlanDishRole[];
     if (restoredRoles.length === 0) {
       const first = pickBestAny(
@@ -174,6 +262,8 @@ export function placeWeek(input: PlaceWeekInput): PlacedDish[] {
         config,
         matchingConfig,
         month,
+        usageCounts,
+        mainsOf,
       );
       const firstRole = dishRoleOf(first.category);
       emit(first, firstRole, "auto");
@@ -194,6 +284,8 @@ export function placeWeek(input: PlaceWeekInput): PlacedDish[] {
         matchingConfig,
         month,
         role,
+        usageCounts,
+        mainsOf,
       );
       // 그 자리에 맞는 후보가 아예 없으면 그 자리는 비운다. 국이 없다고
       // 반찬까지 못 놓는 것보다, 있는 만큼 차리는 편이 낫다.
@@ -220,6 +312,8 @@ function pickBestAny(
   config: MealPlanConfig,
   matchingConfig: MatchingConfig,
   month: number,
+  usageCounts: ReadonlyMap<string, number>,
+  mainsOf: (recipe: ScorableRecipe) => readonly string[],
 ): ScorableRecipe {
   const unused = recipes.filter((recipe) => !usedRecipeIds.has(recipe.id));
   const best = best1(
@@ -229,6 +323,8 @@ function pickBestAny(
     config,
     matchingConfig,
     month,
+    usageCounts,
+    mainsOf,
   );
   // recipes가 비어 있지 않음은 placeWeek이 먼저 확인한다.
   return best as ScorableRecipe;
@@ -244,13 +340,24 @@ function pickBestForRole(
   matchingConfig: MatchingConfig,
   month: number,
   role: MealPlanDishRole,
+  usageCounts: ReadonlyMap<string, number>,
+  mainsOf: (recipe: ScorableRecipe) => readonly string[],
 ): ScorableRecipe | null {
   const candidates = recipes.filter(
     (recipe) =>
       !usedRecipeIds.has(recipe.id) && dishRoleOf(recipe.category) === role,
   );
   if (candidates.length === 0) return null;
-  return best1(candidates, remaining, purchaseShares, config, matchingConfig, month);
+  return best1(
+    candidates,
+    remaining,
+    purchaseShares,
+    config,
+    matchingConfig,
+    month,
+    usageCounts,
+    mainsOf,
+  );
 }
 
 /**
@@ -266,6 +373,8 @@ function best1(
   config: MealPlanConfig,
   matchingConfig: MatchingConfig,
   month: number,
+  usageCounts: ReadonlyMap<string, number>,
+  mainsOf: (recipe: ScorableRecipe) => readonly string[],
 ): ScorableRecipe | null {
   if (candidates.length === 0) return null;
 
@@ -286,11 +395,12 @@ function best1(
       purchaseShares,
       config,
       month,
+      usageCounts,
     );
     if (
       best === null ||
       bestScore === null ||
-      isBetter(recipe, score, best, bestScore)
+      isBetter(recipe, score, best, bestScore, usageCounts, mainsOf)
     ) {
       best = recipe;
       bestScore = score;
@@ -300,16 +410,43 @@ function best1(
   return best;
 }
 
+/**
+ * 이번 주에 이 레시피의 주재료가 이미 몇 번 쓰였는지 (합).
+ * 낮을수록 새로운 재료를 쓰는 요리다.
+ */
+function usageLoad(
+  recipe: ScorableRecipe,
+  usageCounts: ReadonlyMap<string, number>,
+  mainsOf: (recipe: ScorableRecipe) => readonly string[],
+): number {
+  let total = 0;
+  for (const name of mainsOf(recipe)) total += usageCounts.get(name) ?? 0;
+  return total;
+}
+
 function isBetter(
   recipe: ScorableRecipe,
   score: MealPlanScore,
   best: ScorableRecipe,
   bestScore: MealPlanScore,
+  usageCounts: ReadonlyMap<string, number>,
+  mainsOf: (recipe: ScorableRecipe) => readonly string[],
 ): boolean {
   if (score.score !== bestScore.score) return score.score > bestScore.score;
   if (score.matchRate !== bestScore.matchRate) {
     return score.matchRate > bestScore.matchRate;
   }
+
+  // FR-13-09: 여기가 쏠림을 실제로 푸는 자리다.
+  //
+  // 곱셈 감점(repeatPenaltyFactor)은 **점수가 0일 때 아무 일도 하지 않는다** —
+  // 0에 무엇을 곱해도 0이다. 그런데 재료가 바닥난 뒤쪽 끼니는 후보가 전부
+  // 0점이라, 정작 분산이 가장 필요한 구간에서 감점이 안 듣는다. 그 구간의
+  // 순서는 전적으로 동점 처리가 정하므로, 덜 쓴 재료를 여기서 앞세운다.
+  const load = usageLoad(recipe, usageCounts, mainsOf);
+  const bestLoad = usageLoad(best, usageCounts, mainsOf);
+  if (load !== bestLoad) return load < bestLoad;
+
   const byName = recipe.name.localeCompare(best.name, "ko");
   if (byName !== 0) return byName < 0;
   return recipe.id.localeCompare(best.id) < 0;
@@ -342,7 +479,9 @@ export interface StoredDish {
   mealType: MealType;
   isHoliday: boolean;
   holidayName: string | null;
-  recipeId: string;
+  /** 간편식이면 null. */
+  recipeId: string | null;
+  convenience: ConvenienceItem | null;
   role: MealPlanDishRole;
   source: "auto" | "swapped" | "manual";
 }
@@ -367,7 +506,26 @@ export function replayWeek(
   const placed: PlacedDish[] = [];
 
   for (const entry of entries) {
-    const recipe = byId.get(entry.recipeId);
+    // 간편식은 재료를 안 쓰므로 가상 재고를 건드리지 않고 그대로 통과시킨다.
+    if (entry.role === "convenience") {
+      if (!entry.convenience) continue;
+      placed.push({
+        date: entry.date,
+        mealType: entry.mealType,
+        isHoliday: entry.isHoliday,
+        holidayName: entry.holidayName,
+        role: "convenience",
+        recipe: null,
+        convenience: entry.convenience,
+        score: EMPTY_SCORE,
+        source: entry.source,
+        availableBefore: [...new Set(remaining)],
+        consumed: [],
+      });
+      continue;
+    }
+
+    const recipe = entry.recipeId ? byId.get(entry.recipeId) : undefined;
     // 레시피가 지워졌으면 그 요리는 조용히 건너뛴다. 호출부가 다시 채운다.
     if (!recipe) continue;
 
@@ -394,6 +552,7 @@ export function replayWeek(
       holidayName: entry.holidayName,
       role: entry.role,
       recipe,
+      convenience: null,
       score,
       source: entry.source,
       availableBefore: [...ownedNames],

@@ -30,6 +30,9 @@ export function buildShoppingList(
     // FR-13-08: 한 끼니에 요리가 여럿이므로 요리마다 훑는다. 국이 부족한지
     // 반찬이 부족한지가 목록에 남아야 "뭘 포기할지"를 사용자가 고를 수 있다.
     for (const dish of slot.dishes) {
+      // 간편식은 재료가 아니라 완제품이라 여기서 다루지 않는다 —
+      // 장보기 화면이 따로 "사둘 간편식" 묶음으로 보여준다 (FR-13-10).
+      if (!dish.recipe) continue;
       const outOfSeason = new Set(
         outOfSeasonPurchases(dish.missingMainIngredients, month),
       );

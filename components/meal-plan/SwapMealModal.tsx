@@ -53,7 +53,7 @@ export function SwapMealModal({
   // 직접 고르기 탭을 열었을 때만 전체 목록을 부른다 (레시피 탭과 같은 캐시를 쓴다).
   const recipes = useRecipes();
 
-  const currentRecipeId = dish?.recipe.id ?? "";
+  const currentRecipeId = dish?.recipe?.id ?? "";
 
   const searchResults = useMemo(() => {
     const all = recipes.data?.recipes ?? [];
@@ -83,7 +83,7 @@ export function SwapMealModal({
             {DISH_ROLE_LABEL[dish.role]}
           </p>
           <h2 className="text-headline-md text-on-surface">
-            {dish.recipe.name} 대신 뭐 드실래요?
+            {dish.recipe?.name ?? "이 자리"} 대신 뭐 드실래요?
           </h2>
           <p className="text-body-md text-on-surface-variant">
             고르면 바로 바뀌어요. 이번 주에 이미 넣은 요리는 후보에서 빼뒀어요.

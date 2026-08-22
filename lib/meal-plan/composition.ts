@@ -46,4 +46,5 @@ export const DISH_ROLE_LABEL: Record<MealPlanDishRole, string> = {
   main: "한 그릇",
   soup: "국·찌개",
   side: "반찬",
+  convenience: "간편식",
 };

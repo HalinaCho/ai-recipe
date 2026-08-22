@@ -41,6 +41,30 @@ import type { IngredientCategory } from "@/types/domain";
  */
 export const NEUTRAL_DIVERSITY_BONUS = 0.5;
 
+/**
+ * FR-13-09: 한 주에 이미 여러 번 쓰인 재료를 쓰는 레시피를 밀어낸다.
+ *
+ * 재고에 두부가 있으면 후보 대부분이 두부를 쓰게 되어 한 주가 통째로 두부
+ * 요리로 깔린다. 앞에서 다 써버려 뒤쪽 끼니는 전부 0%가 되고, 장보기 목록도
+ * 한쪽으로 쏠린다. "이번 주에 이미 N번 쓴 재료"에 감점을 걸어 흩뜨린다.
+ *
+ * 제철 감점(0.7)보다 약하게 잡은 이유: 반복은 "덜 좋은" 것이지 "틀린" 게
+ * 아니다. 두부가 정말 최선이면 세 번째로도 나와야 한다.
+ */
+export function repeatPenaltyFactor(
+  mainNames: readonly string[],
+  usageCounts: ReadonlyMap<string, number>,
+  config: MealPlanConfig = DEFAULT_MEAL_PLAN_CONFIG,
+): number {
+  if (mainNames.length === 0) return 1;
+  const overused = mainNames.filter(
+    (name) => (usageCounts.get(name) ?? 0) >= config.repeatThreshold,
+  );
+  if (overused.length === 0) return 1;
+  const ratio = overused.length / mainNames.length;
+  return Math.max(0, 1 - ratio * config.repeatPenalty);
+}
+
 /** FR-13-04 공식의 결과. 세 항을 따로 남겨 두어야 왜 이 레시피가 뽑혔는지 설명된다. */
 export interface MealPlanScore {
   /** 0~1. 세 항의 가중합. */
@@ -56,6 +80,8 @@ export interface MealPlanScore {
   seasonFactor: number;
   /** 사야 하는데 지금 제철이 아닌 주재료. 보유 중인 재료는 여기 안 들어온다. */
   outOfSeasonIngredients: string[];
+  /** FR-13-09 반복 감점 계수 (0~1). 1이면 감점 없음. */
+  repeatFactor: number;
   ownedMainIngredients: string[];
   /** FR-13-05 장보기 후보. */
   missingMainIngredients: string[];
@@ -141,6 +167,11 @@ export function scoreForMealPlan(
    * 조용히 엉뚱한 달로 감점당하는 것보다 감점을 안 하는 쪽이 안전하다.
    */
   month?: number,
+  /**
+   * FR-13-09: 이번 주에 각 재료가 이미 몇 번 쓰였는지. 안 넘기면 감점이 없다 —
+   * 주간 맥락을 모르는 호출부(목록 화면·테스트)가 엉뚱하게 깎이면 안 된다.
+   */
+  usageCounts?: ReadonlyMap<string, number>,
 ): MealPlanScore {
   const mainNames = mainIngredientNames(recipe);
 
@@ -180,15 +211,19 @@ export function scoreForMealPlan(
     month === undefined
       ? 1
       : seasonPenaltyFactor(mainNames, missing, month, config.seasonPenalty);
+  const repeatFactor = usageCounts
+    ? repeatPenaltyFactor(mainNames, usageCounts, config)
+    : 1;
   const outOfSeason =
     month === undefined ? [] : outOfSeasonPurchases(missing, month);
 
   return {
-    score: clamp01(base * seasonFactor),
+    score: clamp01(base * seasonFactor * repeatFactor),
     matchRate,
     expiringRate,
     diversityBonus: diversity,
     seasonFactor,
+    repeatFactor,
     outOfSeasonIngredients: outOfSeason,
     ownedMainIngredients: owned,
     missingMainIngredients: missing,

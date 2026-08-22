@@ -469,7 +469,9 @@ function summarizeNutrition(slots: MealPlanSlot[]): WeeklyNutritionSummary {
   const dishes = slots.flatMap((slot) => slot.dishes);
   const summary = emptyNutrition(dishes.length);
   for (const dish of dishes) {
-    const nutrition = POOL_NUTRITION_BY_RECIPE_ID.get(dish.recipe.id) ?? null;
+    const nutrition = dish.recipe
+      ? (POOL_NUTRITION_BY_RECIPE_ID.get(dish.recipe.id) ?? null)
+      : null;
     if (!nutrition) continue;
     summary.calories += nutrition.calories;
     summary.carbohydrate += nutrition.carbohydrate;
@@ -517,6 +519,7 @@ function buildFixtureWeek(weekStart: string): MealPlanSlot[] {
         id,
         role,
         recipe,
+        convenience: null,
         matchScore: recipe.match.score,
         missingMainIngredients: recipe.match.missingMainIngredients,
         // FR-13-07: 픽스처에서도 제철 경고가 실제로 어떻게 보이는지 확인할 수
@@ -576,7 +579,9 @@ export async function loadMealPlanCandidatesFixture(
   const slots = date ? buildFixtureWeek(weekStartOf(date)) : [];
   const allDishes = slots.flatMap((slot) => slot.dishes);
   const current = allDishes.find((dish) => dish.id === entryId);
-  const placedIds = new Set(allDishes.map((dish) => dish.recipe.id));
+  const placedIds = new Set(
+    allDishes.flatMap((dish) => (dish.recipe ? [dish.recipe.id] : [])),
+  );
 
   const candidates = MEAL_PLAN_POOL.filter(
     (entry) => !placedIds.has(entry.recipe.id),
@@ -585,7 +590,7 @@ export async function loadMealPlanCandidatesFixture(
     .slice(0, DEFAULT_MEAL_PLAN_CONFIG.swapCandidateCount);
 
   return {
-    currentRecipeId: current?.recipe.id ?? "",
+    currentRecipeId: current?.recipe?.id ?? "",
     candidates,
   };
 }

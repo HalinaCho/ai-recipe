@@ -26,7 +26,7 @@ const SOURCE_LABEL: Record<MealPlanDish["source"], string | null> = {
  */
 export function MealSlotCard({ slot, onSwapDish }: MealSlotCardProps) {
   const totalCalories = slot.dishes.reduce(
-    (sum, dish) => sum + (dish.recipe.calories ?? 0),
+    (sum, dish) => sum + (dish.recipe?.calories ?? 0),
     0,
   );
   const missingCount = new Set(
@@ -68,7 +68,14 @@ function DishRow({
   dish: MealPlanDish;
   onSwap: () => void;
 }) {
-  const { recipe } = dish;
+  // FR-13-10: 간편식은 레시피가 아니라 사 오는 것이다. 매칭 막대를 그리면
+  // "있는 재료로 만들 수 있다"는 뜻이 되어 거짓말이 되므로 다른 모양으로 둔다.
+  if (dish.convenience) {
+    return <ConvenienceRow item={dish.convenience} />;
+  }
+
+  const recipe = dish.recipe;
+  if (!recipe) return null;
   const missingSummary = formatMissingSummary(recipe.match);
   const sourceLabel = SOURCE_LABEL[dish.source];
   const iconName =
@@ -135,5 +142,38 @@ function DishRow({
         </span>
       )}
     </button>
+  );
+}
+
+/**
+ * 간편식 자리 (FR-13-10). 매칭 막대도 교체 버튼도 없다.
+ *
+ * 막대를 그리면 "있는 재료로 만들 수 있다"는 뜻이 되어 거짓말이 되고,
+ * 교체 버튼을 달면 레시피 후보가 뜨는데 그건 이 자리의 취지와 어긋난다 —
+ * 여기는 "요리하기 귀찮은 날을 위해 사두는 자리"다.
+ */
+function ConvenienceRow({
+  item,
+}: {
+  item: NonNullable<MealPlanDish["convenience"]>;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border-2 border-dashed border-outline-variant bg-surface-container-low p-2.5">
+      <div className="flex items-center gap-2">
+        <span
+          className="material-symbols-outlined shrink-0 text-on-surface-variant"
+          aria-hidden
+        >
+          takeout_dining
+        </span>
+        <span className="shrink-0 rounded-full bg-tertiary-container px-2 py-0.5 text-label-sm text-on-tertiary-container">
+          간편식
+        </span>
+        <span className="min-w-0 flex-1 truncate text-body-lg text-on-surface">
+          {item.name}
+        </span>
+      </div>
+      <p className="text-label-md text-on-surface-variant">{item.note}</p>
+    </div>
   );
 }

@@ -18,6 +18,7 @@ import {
   type StoredDish,
 } from "@/lib/meal-plan/generate";
 import { dishRoleOf } from "@/lib/meal-plan/composition";
+import { convenienceByKey } from "@/lib/meal-plan/convenience";
 import { loadHolidays } from "@/lib/meal-plan/holidays";
 import {
   summarizeWeeklyNutrition,
@@ -375,7 +376,7 @@ async function ensurePlanId(
  * 마이그레이션 시점에 이미 짜여 있던 주가 통째로 깨지지 않게 하려는 것이다.
  */
 function toStoredDish(
-  row: MealPlanEntryRow & { recipe_id: string },
+  row: MealPlanEntryRow,
   holidayName: string | null,
   categoryById?: ReadonlyMap<string, string | null>,
 ): StoredDish {
@@ -385,8 +386,10 @@ function toStoredDish(
     isHoliday: row.is_holiday,
     holidayName,
     recipeId: row.recipe_id,
+    convenience: convenienceByKey(row.convenience_key),
     role:
-      row.dish_role ?? dishRoleOf(categoryById?.get(row.recipe_id) ?? null),
+      row.dish_role ??
+      dishRoleOf(categoryById?.get(row.recipe_id ?? "") ?? null),
     source: row.source,
   };
 }
@@ -420,42 +423,35 @@ async function writeEntries(
   planId: string,
   placed: PlacedDish[],
 ): Promise<void> {
-  const { error } = await supabase.from("meal_plan_entry").upsert(
+  // 이 주의 요리를 통째로 갈아 끼운다.
+  //
+  // upsert를 안 쓰는 이유: 간편식 행은 recipe_id가 null이라 유일성이 부분
+  // 인덱스로 나뉘어 있고(0011), PostgREST의 ON CONFLICT는 부분 인덱스를 못
+  // 잡는다. 게다가 상차림 구성이 바뀌면(반찬 수가 줄거나 일품 단독이 되면)
+  // 어차피 옛 행을 지워야 하므로, 지우고 넣는 편이 규칙이 하나뿐이라 안전하다.
+  const { error: deleteError } = await supabase
+    .from("meal_plan_entry")
+    .delete()
+    .eq("weekly_meal_plan_id", planId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  if (placed.length === 0) return;
+
+  const { error } = await supabase.from("meal_plan_entry").insert(
     placed.map((dish) => ({
       weekly_meal_plan_id: planId,
       date: dish.date,
       meal_type: dish.mealType,
       is_holiday: dish.isHoliday,
       dish_role: dish.role,
-      recipe_id: dish.recipe.id,
+      recipe_id: dish.recipe?.id ?? null,
+      convenience_key: dish.convenience?.key ?? null,
       match_score: dish.score.score,
       missing_main_ingredients: dish.score.missingMainIngredients,
       source: dish.source,
     })),
-    { onConflict: "weekly_meal_plan_id,date,meal_type,recipe_id" },
   );
   if (error) throw new Error(error.message);
-
-  // 요리 단위로 남길 것을 판단한다. 상차림 구성이 바뀌면(반찬 수가 줄거나
-  // 일품 단독으로 바뀌면) 이전 계산의 요리가 남아 상이 뒤섞인다.
-  const keep = new Set(
-    placed.map((dish) => `${slotKey(dish.date, dish.mealType)}|${dish.recipe.id}`),
-  );
-  const existing = await readEntries(supabase, planId);
-  const staleIds = existing
-    .filter(
-      (row) =>
-        !keep.has(`${slotKey(row.date, row.meal_type)}|${row.recipe_id ?? ""}`),
-    )
-    .map((row) => row.id);
-
-  if (staleIds.length > 0) {
-    const { error: deleteError } = await supabase
-      .from("meal_plan_entry")
-      .delete()
-      .in("id", staleIds);
-    if (deleteError) throw new Error(deleteError.message);
-  }
 }
 
 interface BuiltWeek {
@@ -484,13 +480,14 @@ function buildWeek(
   config: MealPlanConfig,
   matchingConfig: MatchingConfig,
 ): BuiltWeek {
-  const withRecipe = entries.filter(
-    (row): row is MealPlanEntryRow & { recipe_id: string } =>
-      row.recipe_id !== null,
+  // 간편식 행은 recipe_id가 null이라, 여기서 거르면 상차림에서 통째로
+  // 사라진다 (FR-13-10). 레시피도 간편식도 아닌 행만 버린다.
+  const usable = entries.filter(
+    (row) => row.recipe_id !== null || row.convenience_key !== null,
   );
 
   const placed = replayWeek(
-    withRecipe.map((row) => toStoredDish(row, holidays.get(row.date) ?? null)),
+    usable.map((row) => toStoredDish(row, holidays.get(row.date) ?? null)),
     recipes,
     context.inventory,
     context.purchaseShares,
@@ -500,8 +497,8 @@ function buildWeek(
 
   // 같은 (끼니, 레시피)로 저장된 행을 찾아 id·배치 점수를 붙인다.
   const rowByDish = new Map(
-    withRecipe.map((row) => [
-      `${slotKey(row.date, row.meal_type)}|${row.recipe_id}`,
+    entries.map((row) => [
+      `${slotKey(row.date, row.meal_type)}|${row.recipe_id ?? row.convenience_key ?? ""}`,
       row,
     ]),
   );
@@ -517,7 +514,7 @@ function buildWeek(
 
   for (const dish of placed) {
     const row = rowByDish.get(
-      `${slotKey(dish.date, dish.mealType)}|${dish.recipe.id}`,
+      `${slotKey(dish.date, dish.mealType)}|${dish.recipe?.id ?? dish.convenience?.key ?? ""}`,
     );
     if (!row) continue;
 
@@ -539,14 +536,17 @@ function buildWeek(
     slot.dishes.push({
       id: row.id,
       role: dish.role,
-      recipe: toListItem(dish.recipe, match, matchingConfig),
+      recipe: dish.recipe
+        ? toListItem(dish.recipe, match, matchingConfig)
+        : null,
+      convenience: dish.convenience,
       // 배치 시점 점수. 저장된 값이 없으면(구버전 행) 지금 값으로 메운다.
       matchScore: row.match_score ?? dish.score.score,
       missingMainIngredients: dish.score.missingMainIngredients,
       outOfSeasonIngredients: dish.score.outOfSeasonIngredients,
       source: dish.source,
     });
-    usedRecipeIds.push(dish.recipe.id);
+    if (dish.recipe) usedRecipeIds.push(dish.recipe.id);
   }
 
   return {
@@ -617,6 +617,12 @@ function lockedFromEntries(
   return locked;
 }
 
+/** 날짜에서 뽑은 안정적인 주차 씨앗. 같은 주면 항상 같은 값이어야 한다. */
+function weekSeedOf(date: string): number {
+  if (!date) return 0;
+  return Math.floor(Date.parse(`${date}T00:00:00Z`) / (7 * 24 * 60 * 60 * 1000));
+}
+
 async function generateInto(
   supabase: ServerSupabaseClient,
   householdId: string,
@@ -649,6 +655,9 @@ async function generateInto(
     inventory: context.inventory,
     purchaseShares: context.purchaseShares,
     locked,
+    // FR-13-10: 주가 바뀌면 다른 간편식이 제안되게 한다. 같은 곰탕만 계속
+    // 뜨면 이미 사둔 사람에게는 쓸모없는 제안이 된다.
+    weekSeed: weekSeedOf(plannedSlots[0]?.date ?? ""),
     config,
     matchingConfig,
   });

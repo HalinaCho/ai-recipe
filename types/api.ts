@@ -362,7 +362,19 @@ export interface MealPlanDish {
   /** meal_plan_entry.id. 교체 대상. */
   id: string;
   role: MealPlanDishRole;
-  recipe: RecipeListItem;
+  /** 간편식이면 null — 레시피가 아니라 사 오는 것이다 (FR-13-10). */
+  recipe: RecipeListItem | null;
+  /**
+   * FR-13-10: 간편조리식일 때만 채워진다. 레시피 소스에 없는, "사서 데우기만
+   * 하는 것"이라 이름과 왜 사두면 좋은지만 있다. 쿠팡·네이버 키가 붙으면
+   * searchQuery가 상품 검색어가 된다.
+   */
+  convenience: {
+    key: string;
+    name: string;
+    searchQuery: string;
+    note: string;
+  } | null;
   /**
    * 배치 시점에 계산된 점수 (FR-13-04의 3항 공식 × 제철 감점).
    * 목록 화면의 match.score와 값이 다를 수 있다 — 식단표는 앞선 요리가

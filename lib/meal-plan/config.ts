@@ -51,6 +51,33 @@ export interface MealPlanConfig {
    * 급격히 늘어 "살 게 너무 많은" 목록이 된다.
    */
   sidesPerMeal: number;
+  /**
+   * FR-13-09: 한 주에 같은 재료가 몇 번 넘게 쓰이면 감점을 시작할지.
+   *
+   * 재고에 두부가 있으면 후보 레시피 대부분이 두부를 쓰게 되어, 한 주가
+   * 통째로 두부 요리로 깔린다. 앞에서 다 써버려 뒤쪽 끼니는 전부 0%가 되고
+   * 장보기 목록도 한쪽으로 쏠린다.
+   */
+  repeatThreshold: number;
+  /**
+   * FR-13-09 감점의 세기 (0~1). 임계를 넘은 재료 비율만큼 점수를 깎는다.
+   *
+   * 실측(재고 9종·요리 19개 기준): 감점 없음이면 최다 재료가 13회 쓰이는데
+   * 0.4면 9회, 0.8이면 8회로 줄고 서로 다른 재료는 43→46종으로 는다.
+   * 0.7은 그 사이에서 고른 값이다.
+   *
+   * **임계(repeatThreshold)를 1로 낮추면 오히려 나빠진다** (11회). 모든 재료가
+   * 첫 사용부터 감점되어 감점이 사실상 상수가 되고, 그러면 순위가 감점 전과
+   * 같아지기 때문이다. 세기만 올리고 임계는 2로 둔다.
+   */
+  repeatPenalty: number;
+  /**
+   * FR-13-10: 한 주에 넣을 간편조리식 끼니 수.
+   *
+   * 2로 잡은 이유: 열 끼 중 둘이면 "요리 안 하는 주"로 보이지 않으면서도,
+   * 바쁜 날 두 번은 데우기만 하면 되는 여지가 생긴다.
+   */
+  convenienceMealsPerWeek: number;
   /** FR-12-02: 스왑 모달에 뿌릴 후보 개수. */
   swapCandidateCount: number;
   /**
@@ -73,6 +100,9 @@ export const DEFAULT_MEAL_PLAN_CONFIG: MealPlanConfig = {
   ],
   seasonPenalty: 0.7,
   sidesPerMeal: 2,
+  repeatThreshold: 2,
+  repeatPenalty: 0.7,
+  convenienceMealsPerWeek: 2,
   swapCandidateCount: 20,
   candidatePoolSize: 300,
 };
