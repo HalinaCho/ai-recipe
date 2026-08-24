@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PreviewBadge } from "@/components/ui/PreviewBadge";
 import { parseCategories } from "@/lib/recipes/meal-suitability";
+import { parseMoods } from "@/lib/recipes/mood";
 import { useRecipes } from "@/lib/hooks/use-recipes";
 import { RecipeCard } from "./RecipeCard";
 import { RecipeCategoryFilter } from "./RecipeCategoryFilter";
 import { RecipeFreshnessBanner } from "./RecipeFreshnessBanner";
+import { RecipeMoodFilter } from "./RecipeMoodFilter";
 import { RecipeSearchInput } from "./RecipeSearchInput";
 import {
   RecipeEmptyState,
@@ -34,6 +36,9 @@ export function RecipeList() {
   // 보고됨).
   const [categories, setCategories] = useState<string[]>(() =>
     parseCategories(searchParams.get("categories")),
+  );
+  const [moods, setMoods] = useState<string[]>(() =>
+    parseMoods(searchParams.get("moods")),
   );
 
   // 입력창엔 타이핑하는 즉시 보여주고, 실제 검색(쿼리)은 멈춘 뒤 잠깐
@@ -64,19 +69,21 @@ export function RecipeList() {
     const params = new URLSearchParams(searchParams.toString());
     if (categories.length > 0) params.set("categories", categories.join(","));
     else params.delete("categories");
+    if (moods.length > 0) params.set("moods", moods.join(","));
+    else params.delete("moods");
     if (search) params.set("q", search);
     else params.delete("q");
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // searchParams를 의존성에 넣으면 이 replace가 만든 변화가 다시 이
-    // effect를 불러 무한 루프가 된다 — categories/search가 바뀔 때만 돈다.
+    // effect를 불러 무한 루프가 된다 — categories/moods/search가 바뀔 때만 돈다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories, search, pathname, router]);
+  }, [categories, moods, search, pathname, router]);
 
   const { data, isPending, isError, error, refetch, dataUpdatedAt } =
-    useRecipes(categories, search);
+    useRecipes(categories, moods, search);
   const recipes = data?.recipes ?? [];
-  const filtering = categories.length > 0;
+  const filtering = categories.length > 0 || moods.length > 0;
   const searching = search !== "";
 
   return (
@@ -86,6 +93,7 @@ export function RecipeList() {
 
       <RecipeSearchInput value={searchInput} onChange={setSearchInput} />
       <RecipeCategoryFilter selected={categories} onChange={setCategories} />
+      <RecipeMoodFilter selected={moods} onChange={setMoods} />
 
       {isPending && <RecipeListSkeleton />}
 
@@ -112,9 +120,15 @@ export function RecipeList() {
       {!isPending && !isError && recipes.length === 0 && !searching && filtering && (
         <Card className="flex flex-col gap-3 p-4">
           <p className="text-body-lg text-on-surface">
-            고른 종류에는 맞는 레시피가 없어요.
+            고른 종류·기분에는 맞는 레시피가 없어요.
           </p>
-          <Button variant="secondary" onClick={() => setCategories([])}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setCategories([]);
+              setMoods([]);
+            }}
+          >
             전체 보기
           </Button>
         </Card>
@@ -130,7 +144,7 @@ export function RecipeList() {
             {searching
               ? `"${search}"로 찾은 레시피예요.`
               : filtering
-                ? `${categories.join("·")} 중에서 지금 있는 재료로 만들기 좋은 순서예요.`
+                ? `${[...categories, ...moods].join("·")} 중에서 지금 있는 재료로 만들기 좋은 순서예요.`
                 : "지금 있는 재료로 만들기 좋은 순서예요. 오래 둔 재료를 먼저 쓰는 요리를 위로 올렸어요."}
           </p>
           <ul className="flex flex-col gap-3">

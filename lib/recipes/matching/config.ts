@@ -42,6 +42,22 @@ export interface MatchingConfig {
   todayRecipeCount: number;
   /** FR-09-02: 온디맨드 목록의 기본/최대 길이. */
   listLimit: { default: number; max: number };
+  /**
+   * FR-09-09: 같은 재료를 쓰는 레시피가 상위권에 몰리지 않게 하는 감점.
+   * 재고에 있는 재료 하나가 보유·소진임박·취향 세 항목 모두에서 동시에
+   * 가산점을 받으면, 그 재료를 쓰는 레시피들이 서로 순위 다툼만 하며 목록
+   * 상단을 도배한다(실사용 확인: 두부 요리 네 개가 연달아 1~4위). 식단표의
+   * FR-13-09(`repeatPenaltyFactor`)와 같은 발상을 레시피 탭용으로 옮긴 것 —
+   * 다만 여긴 "이미 정렬된 목록을 그리디하게 재정렬"하는 맥락이라 별도 손잡이로
+   * 둔다.
+   */
+  diversity: {
+    /** 이미 몇 번 나온 재료부터 감점을 시작할지. */
+    repeatThreshold: number;
+    /** 감점 세기 (0~1). 식단표(0.7)보다 약하게 잡았다 — 레시피 탭은 훑어보는
+     * 목록이라 자동 배치보다 덜 공격적이어도 된다. */
+    repeatPenalty: number;
+  };
 }
 
 export const DEFAULT_MATCHING_CONFIG: MatchingConfig = {
@@ -50,4 +66,5 @@ export const DEFAULT_MATCHING_CONFIG: MatchingConfig = {
   mealKitCtaBand: { min: 0.4, max: 0.7 },
   todayRecipeCount: 3,
   listLimit: { default: 50, max: 200 },
+  diversity: { repeatThreshold: 2, repeatPenalty: 0.5 },
 };

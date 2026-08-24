@@ -8,11 +8,13 @@ import {
 import { listInStockItems } from "@/lib/inventory/queries";
 import type { ServerSupabaseClient } from "@/lib/inventory/types";
 import { isMealSuitable, RECIPE_CATEGORIES } from "@/lib/recipes/meal-suitability";
+import { resolveMoods } from "@/lib/recipes/mood";
 import {
   DEFAULT_MATCHING_CONFIG,
   type MatchingConfig,
 } from "@/lib/recipes/matching/config";
 import {
+  diversifyRanked,
   mainIngredientNames,
   rankRecipes,
   scoreRecipe,
@@ -66,10 +68,11 @@ export interface HouseholdMatchContext {
   items: Awaited<ReturnType<typeof listInStockItems>>;
   ownedNames: Set<string>;
   expiringNames: Set<string>;
-  /** V2 Level 1: 취향 퀴즈 좋아요 + 북마크 + 요리 이력에서 모은 선호 재료. */
-  preferredNames: Set<string>;
-  /** V2 Level 1: 취향 퀴즈 싫어요에서 모은 재료. */
-  dislikedNames: Set<string>;
+  /**
+   * V2 Level 1: 재료별 순 선호도(-1~1). 취향 퀴즈 좋아요/싫어요 + 북마크 +
+   * 요리 이력에서 모은다.
+   */
+  ingredientAffinity: Map<string, number>;
 }
 
 /**
@@ -93,18 +96,16 @@ export async function loadHouseholdMatchContext(
       items.map((item) => canonicalIngredient(item.normalizedName)),
     ),
     expiringNames: selectExpiringNames(items, config),
-    preferredNames: signals.preferredNames,
-    dislikedNames: signals.dislikedNames,
+    ingredientAffinity: signals.ingredientAffinity,
   };
 }
 
 export interface PreferenceSignals {
-  preferredNames: Set<string>;
-  dislikedNames: Set<string>;
+  ingredientAffinity: Map<string, number>;
 }
 
 /**
- * 취향 신호를 "재료" 집합으로 모은다 (V2 Level 1).
+ * 취향 신호를 "재료별 순 선호도"로 모은다 (V2 Level 1).
  *
  * 레시피 단위가 아니라 재료 단위로 일반화하는 이유: 카레 하나를 좋아요
  * 했다고 그 카레 레시피만 올려서는 취향 반영이 거의 안 느껴진다. 재료로
@@ -115,6 +116,12 @@ export interface PreferenceSignals {
  * 실제로 만들어 먹은 것도 명시적 좋아요만큼 강한 신호다. '보통'(neutral)은
  * 어느 쪽도 아니다 — 신호 없음이 아니라 "그저 그렇다"는 명시적 중립이므로
  * 가산·감산 어느 쪽에도 넣지 않는다.
+ *
+ * **재료마다 "몇 번 좋아요·싫어요를 받았는지"를 세어 비율로 만든다** — 있음/
+ * 없음(Set)만 보면 한 재료가 좋아요 레시피에도, 싫어요 레시피에도 한 번이라도
+ * 걸치면 완전히 상쇄돼 0이 된다(실사용에서 확인된 버그: 두부가 좋아요 5·싫어요
+ * 1이었는데도 점수 기여가 정확히 0이었다). 넓게 평가할수록 흔한 재료일수록
+ * 양쪽에 다 걸리기 쉬워서, 하필 자주 쓰는 재료들이 전부 상쇄되는 결과였다.
  */
 export async function loadPreferenceSignals(
   supabase: ServerSupabaseClient,
@@ -154,27 +161,35 @@ export async function loadPreferenceSignals(
   for (const row of cookRows ?? []) likedRecipeIds.add(row.recipe_id);
 
   const allIds = [...new Set([...likedRecipeIds, ...dislikedRecipeIds])];
-  if (allIds.length === 0) {
-    return { preferredNames: new Set(), dislikedNames: new Set() };
-  }
+  if (allIds.length === 0) return { ingredientAffinity: new Map() };
 
   const recipes = await fetchScorableRecipes(supabase, allIds);
   const byId = new Map(recipes.map((recipe) => [recipe.id, recipe]));
 
-  const preferredNames = new Set<string>();
-  const dislikedNames = new Set<string>();
+  const likeCounts = new Map<string, number>();
+  const dislikeCounts = new Map<string, number>();
+  const bump = (counts: Map<string, number>, name: string) =>
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+
   for (const id of likedRecipeIds) {
     const recipe = byId.get(id);
     if (!recipe) continue;
-    for (const name of mainIngredientNames(recipe)) preferredNames.add(name);
+    for (const name of mainIngredientNames(recipe)) bump(likeCounts, name);
   }
   for (const id of dislikedRecipeIds) {
     const recipe = byId.get(id);
     if (!recipe) continue;
-    for (const name of mainIngredientNames(recipe)) dislikedNames.add(name);
+    for (const name of mainIngredientNames(recipe)) bump(dislikeCounts, name);
   }
 
-  return { preferredNames, dislikedNames };
+  const ingredientAffinity = new Map<string, number>();
+  for (const name of new Set([...likeCounts.keys(), ...dislikeCounts.keys()])) {
+    const likes = likeCounts.get(name) ?? 0;
+    const dislikes = dislikeCounts.get(name) ?? 0;
+    ingredientAffinity.set(name, (likes - dislikes) / (likes + dislikes));
+  }
+
+  return { ingredientAffinity };
 }
 
 /** "요리함" 처리 이력에 한 줄 남긴다. 실패해도 재고 소진 자체는 막지 않는다. */
@@ -487,6 +502,12 @@ export async function buildRankedRecipeList(
    */
   categories: readonly string[] = [],
   /**
+   * FR-09-08: "오늘 뭐 땡겨요" 무드. 비어 있으면 전부. 종류 필터와 같은 이유로
+   * 여기서 거른다 — 매칭순 상위 limit개를 뽑기 전에 걸러야 어떤 무드를
+   * 골라도 목록이 제대로 찬다.
+   */
+  moods: readonly string[] = [],
+  /**
    * 자유 검색어(레시피 검색 기능). 있으면 "보유 재료와 겹치는 것"이 아니라
    * 이름·주재료에 이 문자열이 들어간 레시피 전체에서 찾는다. 검색 결과가
    * 0건이면 재고 샘플로 대체하지 않는다 — "김치"를 검색했는데 엉뚱한
@@ -508,19 +529,34 @@ export async function buildRankedRecipeList(
         ? []
         : await fetchRecipeSample(supabase, limit);
 
-  const wanted = new Set(categories);
-  const recipes =
-    wanted.size === 0
+  const wantedCategories = new Set(categories);
+  const byCategoryMatch =
+    wantedCategories.size === 0
       ? all
-      : all.filter((recipe) => wanted.has(recipe.category ?? "기타"));
+      : all.filter((recipe) => wantedCategories.has(recipe.category ?? "기타"));
 
-  return rankRecipes(
+  const wantedMoods = new Set(moods);
+  const recipes =
+    wantedMoods.size === 0
+      ? byCategoryMatch
+      : byCategoryMatch.filter((recipe) =>
+          resolveMoods(recipe).some((mood) => wantedMoods.has(mood)),
+        );
+
+  const ranked = rankRecipes(
     recipes,
     context.ownedNames,
     context.expiringNames,
-    context.preferredNames,
-    context.dislikedNames,
+    context.ingredientAffinity,
     config,
+  );
+
+  // FR-09-09: 같은 재료 레시피가 상위권을 도배하지 않게, 실제로 화면에 보일
+  // 만한 범위(limit의 몇 배) 안에서만 재정렬한다 — 하위권까지 다 도는 건 낭비.
+  return diversifyRanked(
+    ranked,
+    Math.min(ranked.length, limit * 4),
+    config.diversity,
   ).slice(0, limit);
 }
 
@@ -563,8 +599,7 @@ export async function listBookmarkedRecipes(
       recipe,
       context.ownedNames,
       context.expiringNames,
-      context.preferredNames,
-      context.dislikedNames,
+      context.ingredientAffinity,
       config,
     );
     return [toListItem(recipe, match, config)];
@@ -599,7 +634,7 @@ export async function getOrCreateTodayRecipes(
       supabase,
       context.ownedNames,
     );
-    const ranked = rankRecipes(
+    const rankedAll = rankRecipes(
       // FR-13-06: 오늘의 저녁거리를 묻는 자리라 후식은 후보가 아니다.
       // 레시피 탭 목록(buildRankedRecipeList)에는 그대로 남는다 — 거기서는
       // 분류 배지를 붙여 구분만 하고 감추지 않는다.
@@ -608,14 +643,19 @@ export async function getOrCreateTodayRecipes(
       ),
       context.ownedNames,
       context.expiringNames,
-      context.preferredNames,
-      context.dislikedNames,
+      context.ingredientAffinity,
       config,
     )
       // 겹치는 재료가 하나도 없는 레시피를 "오늘의 추천"으로 내밀 이유는 없다.
       // 후보가 없으면 그냥 빈 목록이고, 화면은 재고를 채우라고 안내한다.
-      .filter((item) => item.match.score > 0)
-      .slice(0, config.todayRecipeCount);
+      .filter((item) => item.match.score > 0);
+
+    // FR-09-09: 오늘의 추천 3개가 전부 같은 재료 요리로 채워지지 않게 한다.
+    const ranked = diversifyRanked(
+      rankedAll,
+      Math.min(rankedAll.length, config.todayRecipeCount * 4),
+      config.diversity,
+    ).slice(0, config.todayRecipeCount);
 
     if (ranked.length === 0) return [];
 
@@ -646,8 +686,7 @@ export async function getOrCreateTodayRecipes(
       recipe,
       context.ownedNames,
       context.expiringNames,
-      context.preferredNames,
-      context.dislikedNames,
+      context.ingredientAffinity,
       config,
     );
     return [toListItem(recipe, match, config)];
@@ -714,8 +753,7 @@ export async function loadRecipeMatch(
       recipe,
       context.ownedNames,
       context.expiringNames,
-      context.preferredNames,
-      context.dislikedNames,
+      context.ingredientAffinity,
       config,
     ),
     context,

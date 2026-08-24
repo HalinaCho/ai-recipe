@@ -67,8 +67,20 @@ export function selectExpiringNames(
   return names;
 }
 
-/** 신호가 없을 때 기본값으로 쓰는 빈 집합. 매 호출마다 새로 만들지 않는다. */
-const EMPTY_NAMES: ReadonlySet<string> = new Set();
+/** 신호가 없을 때 기본값으로 쓰는 빈 맵. 매 호출마다 새로 만들지 않는다. */
+const EMPTY_AFFINITY: ReadonlyMap<string, number> = new Map();
+
+/**
+ * 재료별 순 선호도 맵. 값은 -1(완전히 기피)~1(완전히 선호).
+ * `(좋아요로 이 재료를 쓴 레시피 수 − 싫어요로 이 재료를 쓴 레시피 수) /
+ * (좋아요 수 + 싫어요 수)`로 계산한다.
+ *
+ * **있음/없음(Set) 대신 비율을 쓰는 이유**: 실사용에서 확인된 버그다. 한
+ * 재료가 좋아요 레시피에도, 싫어요 레시피에도 한 번이라도 걸치면(흔한 재료일수록
+ * 그럴 확률이 높다) Set 두 개로는 완전히 상쇄돼 0이 된다 — 두부가 좋아요 5번·
+ * 싫어요 1번이어도 기여가 정확히 0이었다. 비율로 보면 5:1이 살아남는다.
+ */
+export type IngredientAffinity = ReadonlyMap<string, number>;
 
 /**
  * 추천 V2 Level 1: 취향 신호(퀴즈·북마크·요리 이력)가 하나도 없는 가구는
@@ -106,18 +118,16 @@ export function resolveWeights(
  * 0/0을 1로 봐서 "완벽 매칭"으로 올려버리면, 데이터가 부실한 레시피가
  * 추천 최상단을 차지한다.
  *
- * preferredNames·dislikedNames는 취향 퀴즈(좋아요/싫어요)·북마크·요리 이력에서
- * 모은 "재료" 집합이다(레시피 단위가 아니라 재료 단위로 일반화 — 카레를
- * 좋아하면 다른 카레류도 가산점을 받는다). 두 집합 모두 비어 있으면 이
- * 가구는 아직 취향 신호가 없는 것으로 보고 `resolveWeights`가 가중치를
- * 재배분한다.
+ * ingredientAffinity는 취향 퀴즈(좋아요/싫어요)·북마크·요리 이력에서 모은
+ * "재료별 순 선호도"다(레시피 단위가 아니라 재료 단위로 일반화 — 카레를
+ * 좋아하면 다른 카레류도 가산점을 받는다). 비어 있으면 이 가구는 아직 취향
+ * 신호가 없는 것으로 보고 `resolveWeights`가 가중치를 재배분한다.
  */
 export function scoreRecipe(
   recipe: ScorableRecipe,
   ownedNames: ReadonlySet<string>,
   expiringNames: ReadonlySet<string>,
-  preferredNames: ReadonlySet<string> = EMPTY_NAMES,
-  dislikedNames: ReadonlySet<string> = EMPTY_NAMES,
+  ingredientAffinity: IngredientAffinity = EMPTY_AFFINITY,
   config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
 ): RecipeMatch {
   const mainNames = mainIngredientNames(recipe);
@@ -149,15 +159,13 @@ export function scoreRecipe(
   const matchRate = owned.length / mainNames.length;
   const expiringRate = expiring.length / mainNames.length;
 
-  const hasPreferenceSignal = preferredNames.size > 0 || dislikedNames.size > 0;
-  const preferredCount = mainNames.filter((name) =>
-    preferredNames.has(name),
-  ).length;
-  const dislikedCount = mainNames.filter((name) =>
-    dislikedNames.has(name),
-  ).length;
-  // -1~1: 싫어하는 재료 겹침이 좋아하는 재료 겹침을 그대로 상쇄한다.
-  const preferenceRate = (preferredCount - dislikedCount) / mainNames.length;
+  const hasPreferenceSignal = ingredientAffinity.size > 0;
+  // 주재료들의 순 선호도 평균(-1~1). 신호가 없는 재료는 0(중립)으로 본다.
+  const preferenceRate =
+    mainNames.reduce(
+      (sum, name) => sum + (ingredientAffinity.get(name) ?? 0),
+      0,
+    ) / mainNames.length;
 
   const weights = resolveWeights(config, hasPreferenceSignal);
 
@@ -175,6 +183,76 @@ export function scoreRecipe(
     missingMainIngredients: missing,
     usesExpiringIngredients: expiring,
   };
+}
+
+/**
+ * FR-09-09: 상위 윈도우 안에서 같은 재료를 쓰는 레시피가 몰리지 않게 그리디로
+ * 재정렬한다.
+ *
+ * 재고에 있는 재료 하나가 보유·소진임박·취향 세 항목 모두에서 동시에
+ * 가산점을 받으면, 그 재료를 쓰는 레시피들이 서로 순위 다툼만 하며 목록
+ * 상단을 도배한다(실사용 확인: 두부 요리 네 개가 연달아 1~4위). 이미 몇 번
+ * 나왔는지(`usageCounts`)를 세면서 매번 "원점수 × 반복 감점"이 가장 높은
+ * 항목을 뽑는다 — 식단표 FR-13-09(`repeatPenaltyFactor`)와 같은 감점 공식을
+ * 그대로 재사용한다.
+ *
+ * 윈도우 밖(하위권)은 건드리지 않는다 — 어차피 점수가 낮아 화면에 잘 안
+ * 보이는 자리라, 전체를 그리디로 도는 건 낭비다.
+ */
+export function diversifyRanked(
+  ranked: readonly RecipeListItem[],
+  windowSize: number,
+  diversity: MatchingConfig["diversity"] = DEFAULT_MATCHING_CONFIG.diversity,
+): RecipeListItem[] {
+  const window = ranked.slice(0, windowSize);
+  const rest = ranked.slice(windowSize);
+
+  const remaining = [...window];
+  const usageCounts = new Map<string, number>();
+  const picked: RecipeListItem[] = [];
+
+  while (remaining.length > 0) {
+    let bestIndex = 0;
+    let bestEffectiveScore = -Infinity;
+
+    for (let i = 0; i < remaining.length; i++) {
+      const names = remaining[i].match.ownedMainIngredients;
+      const factor = repeatPenaltyFactor(names, usageCounts, diversity);
+      const effectiveScore = remaining[i].match.score * factor;
+      if (effectiveScore > bestEffectiveScore) {
+        bestEffectiveScore = effectiveScore;
+        bestIndex = i;
+      }
+    }
+
+    const [item] = remaining.splice(bestIndex, 1);
+    picked.push(item);
+    for (const name of item.match.ownedMainIngredients) {
+      usageCounts.set(name, (usageCounts.get(name) ?? 0) + 1);
+    }
+  }
+
+  return [...picked, ...rest];
+}
+
+/**
+ * FR-09-09 감점 공식. 식단표의 FR-13-09(`repeatPenaltyFactor`, `lib/meal-plan/score.ts`)와
+ * 같은 공식을 쓴다 — 이미 검증된 계산이라 새로 설계할 이유가 없다. 다만 그쪽은
+ * "이번 주 슬롯을 채우며 누적되는 usageCounts"가 맥락이고, 여기는 "정렬된
+ * 목록을 그리디로 재정렬"하는 맥락이라 별도 함수로 둔다.
+ */
+function repeatPenaltyFactor(
+  names: readonly string[],
+  usageCounts: ReadonlyMap<string, number>,
+  diversity: MatchingConfig["diversity"],
+): number {
+  if (names.length === 0) return 1;
+  const overused = names.filter(
+    (name) => (usageCounts.get(name) ?? 0) >= diversity.repeatThreshold,
+  );
+  if (overused.length === 0) return 1;
+  const ratio = overused.length / names.length;
+  return Math.max(0, 1 - ratio * diversity.repeatPenalty);
 }
 
 /**
@@ -218,8 +296,7 @@ export function rankRecipes(
   recipes: ScorableRecipe[],
   ownedNames: ReadonlySet<string>,
   expiringNames: ReadonlySet<string>,
-  preferredNames: ReadonlySet<string> = EMPTY_NAMES,
-  dislikedNames: ReadonlySet<string> = EMPTY_NAMES,
+  ingredientAffinity: IngredientAffinity = EMPTY_AFFINITY,
   config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
 ): RecipeListItem[] {
   return recipes
@@ -230,8 +307,7 @@ export function rankRecipes(
           recipe,
           ownedNames,
           expiringNames,
-          preferredNames,
-          dislikedNames,
+          ingredientAffinity,
           config,
         ),
         config,

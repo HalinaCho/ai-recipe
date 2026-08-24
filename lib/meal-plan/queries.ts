@@ -209,8 +209,7 @@ export interface MealPlanContext {
   ownedNames: Set<string>;
   purchaseShares: Map<IngredientCategory, number>;
   /** V2 Level 1: 레시피 탭과 같은 취향 신호. 후보 풀 선정에 반영한다. */
-  preferredNames: Set<string>;
-  dislikedNames: Set<string>;
+  ingredientAffinity: Map<string, number>;
 }
 
 /**
@@ -270,8 +269,7 @@ export async function loadMealPlanContext(
       today,
       config,
     ),
-    preferredNames: signals.preferredNames,
-    dislikedNames: signals.dislikedNames,
+    ingredientAffinity: signals.ingredientAffinity,
   };
 }
 
@@ -313,8 +311,7 @@ export async function loadCandidatePool(
     overlapping,
     context.ownedNames,
     expiringNames,
-    context.preferredNames,
-    context.dislikedNames,
+    context.ingredientAffinity,
     matchingConfig,
   ).slice(0, config.candidatePoolSize);
 

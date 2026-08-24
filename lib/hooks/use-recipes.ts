@@ -36,21 +36,27 @@ export const cookChecklistQueryKey = (id: string) =>
  * 상위 몇 개만 클라이언트에서 걸러내면 원하는 레시피가 애초에 안 왔을 수
  * 있어서다.
  */
-export function useRecipes(categories: readonly string[] = [], search = "") {
+export function useRecipes(
+  categories: readonly string[] = [],
+  moods: readonly string[] = [],
+  search = "",
+) {
   // 정렬해서 키를 만든다 — [반찬,국]과 [국,반찬]은 같은 요청인데 키가 다르면
   // 같은 목록을 두 번 받아 온다.
   const categoryKey = [...categories].sort().join(",");
+  const moodKey = [...moods].sort().join(",");
   const searchKey = search.trim();
 
   return useQuery<RecipeListResponse>({
     // ["recipes"]가 접두사로 남아야 재고 변경 시 함께 무효화된다.
-    queryKey: [...RECIPES_QUERY_KEY, "list", categoryKey, searchKey],
+    queryKey: [...RECIPES_QUERY_KEY, "list", categoryKey, moodKey, searchKey],
     queryFn: () => {
       if (isFixturePreview()) {
         return loadRecipeListFixture(categories, searchKey);
       }
       const params = new URLSearchParams();
       if (categoryKey) params.set("categories", categoryKey);
+      if (moodKey) params.set("moods", moodKey);
       if (searchKey) params.set("q", searchKey);
       const qs = params.toString();
       return apiFetch<RecipeListResponse>(

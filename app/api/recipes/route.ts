@@ -3,6 +3,7 @@ import { getHouseholdContext } from "@/lib/inventory/household-context";
 import { DEFAULT_MATCHING_CONFIG } from "@/lib/recipes/matching/config";
 import { buildRankedRecipeList } from "@/lib/recipes/matching/queries";
 import { parseCategories } from "@/lib/recipes/meal-suitability";
+import { parseMoods } from "@/lib/recipes/mood";
 import { createClient } from "@/lib/supabase/server";
 import type { RecipeListResponse } from "@/types/api";
 
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const limit = resolveLimit(params.get("limit"));
   const categories = parseCategories(params.get("categories"));
+  const moods = parseMoods(params.get("moods"));
   const query = params.get("q")?.trim() || undefined;
 
   try {
@@ -34,6 +36,7 @@ export async function GET(request: Request) {
       limit,
       undefined,
       categories,
+      moods,
       query,
     );
     const response: RecipeListResponse = { recipes };
