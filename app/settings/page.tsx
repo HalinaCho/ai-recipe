@@ -12,8 +12,19 @@ const ENTRIES = [
 
 export default function SettingsPage() {
   return (
-    <div className="flex flex-col gap-4">
-      <TopAppBar title="마이페이지" />
+    <div className="mx-auto flex max-w-md flex-col gap-4">
+      <TopAppBar
+        title="마이페이지"
+        action={
+          <Link
+            href="/home"
+            aria-label="홈으로 돌아가기"
+            className="flex h-12 w-12 items-center justify-center rounded-full text-on-surface-variant transition-all active:scale-95"
+          >
+            <span className="material-symbols-outlined text-2xl">close</span>
+          </Link>
+        }
+      />
       <div className="px-container-padding flex flex-col gap-3">
         {ENTRIES.map((entry) => (
           <Link key={entry.href} href={entry.href}>

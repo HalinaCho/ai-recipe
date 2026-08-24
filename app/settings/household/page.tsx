@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TopAppBar } from "@/components/ui/TopAppBar";
 import { Card } from "@/components/ui/Card";
@@ -16,8 +17,19 @@ export default async function HouseholdSettingsPage() {
     .order("role", { ascending: true });
 
   return (
-    <div className="flex flex-col gap-4">
-      <TopAppBar title="가구 구성원" />
+    <div className="mx-auto flex max-w-md flex-col gap-4">
+      <TopAppBar
+        title="가구 구성원"
+        action={
+          <Link
+            href="/settings"
+            aria-label="마이페이지로 돌아가기"
+            className="flex h-12 w-12 items-center justify-center rounded-full text-on-surface-variant transition-all active:scale-95"
+          >
+            <span className="material-symbols-outlined text-2xl">close</span>
+          </Link>
+        }
+      />
       <div className="px-container-padding flex flex-col gap-3">
         {members?.length ? (
           members.map((m) => (
