@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -27,6 +27,7 @@ import { RecipeErrorCard } from "./RecipeStates";
  * FR-05-01 "요리함" 진입점.
  */
 export function RecipeDetailView({ id }: { id: string }) {
+  const router = useRouter();
   const { data, isPending, isError, error, refetch } = useRecipeDetail(id);
   const [cookOpen, setCookOpen] = useState(false);
 
@@ -35,13 +36,18 @@ export function RecipeDetailView({ id }: { id: string }) {
       <TopAppBar
         title="레시피 상세"
         action={
-          <Link
-            href="/recipes"
-            aria-label="레시피 목록으로 돌아가기"
+          // 하드코딩된 /recipes 링크 대신 뒤로가기를 쓴다 — 레시피 탭의
+          // 검색어·필터(FR-09-04)나 북마크 목록처럼 여러 곳에서 들어올 수
+          // 있는데, 고정 링크는 오던 곳의 상태를 지우고 처음 화면으로 되돌려
+          // 버린다.
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="뒤로 가기"
             className="flex h-12 w-12 items-center justify-center rounded-full text-on-surface-variant transition-all active:scale-95"
           >
             <span className="material-symbols-outlined text-2xl">close</span>
-          </Link>
+          </button>
         }
       />
 

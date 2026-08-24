@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PreviewBadge } from "@/components/ui/PreviewBadge";
+import { parseCategories } from "@/lib/recipes/meal-suitability";
 import { useRecipes } from "@/lib/hooks/use-recipes";
 import { RecipeCard } from "./RecipeCard";
 import { RecipeCategoryFilter } from "./RecipeCategoryFilter";
@@ -22,13 +24,25 @@ const SEARCH_DEBOUNCE_MS = 300;
  * 여기서 다시 정렬하지 않는다 — 첫 장이 곧 "지금 가장 만들 만한 것"이다.
  */
 export function RecipeList() {
-  const [categories, setCategories] = useState<string[]>([]);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // 검색어·종류 필터를 주소(쿼리스트링)에 실어 둔다. 상세 화면에 들어갔다
+  // 뒤로가기로 돌아오면 이 컴포넌트는 통째로 다시 마운트되는데, 처음 상태를
+  // 여기서 복원하지 않으면 방금 검색한 게 사라진 것처럼 보인다(실제 버그로
+  // 보고됨).
+  const [categories, setCategories] = useState<string[]>(() =>
+    parseCategories(searchParams.get("categories")),
+  );
 
   // 입력창엔 타이핑하는 즉시 보여주고, 실제 검색(쿼리)은 멈춘 뒤 잠깐
   // 기다렸다 보낸다. 지울 때는 기다리지 않고 바로 비운다 — "지우기"를
   // 눌렀는데 결과가 300ms 늦게 사라지면 오히려 어색하다.
-  const [searchInput, setSearchInputRaw] = useState("");
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInputRaw] = useState(
+    () => searchParams.get("q")?.trim() ?? "",
+  );
+  const [search, setSearch] = useState(searchInput);
   const setSearchInput = (next: string) => {
     setSearchInputRaw(next);
     if (next === "") setSearch("");
@@ -42,6 +56,22 @@ export function RecipeList() {
     );
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // 검색어·필터가 바뀔 때마다 주소를 따라오게 한다. push가 아니라 replace를
+  // 쓴다 — 필터를 세 번 눌렀다고 뒤로가기를 세 번 눌러야 레시피 탭을
+  // 벗어나면 오히려 헷갈린다. ?preview= 같은 다른 쿼리는 그대로 둔다.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (categories.length > 0) params.set("categories", categories.join(","));
+    else params.delete("categories");
+    if (search) params.set("q", search);
+    else params.delete("q");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // searchParams를 의존성에 넣으면 이 replace가 만든 변화가 다시 이
+    // effect를 불러 무한 루프가 된다 — categories/search가 바뀔 때만 돈다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, search, pathname, router]);
 
   const { data, isPending, isError, error, refetch, dataUpdatedAt } =
     useRecipes(categories, search);
