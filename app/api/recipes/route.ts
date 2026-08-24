@@ -25,6 +25,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const limit = resolveLimit(params.get("limit"));
   const categories = parseCategories(params.get("categories"));
+  const query = params.get("q")?.trim() || undefined;
 
   try {
     const recipes = await buildRankedRecipeList(
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
       limit,
       undefined,
       categories,
+      query,
     );
     const response: RecipeListResponse = { recipes };
     return NextResponse.json(response);

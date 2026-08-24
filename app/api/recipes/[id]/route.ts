@@ -23,7 +23,18 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const detail = await loadRecipeMatch(supabase, context.householdId, id);
+    const [detail, { data: bookmarkRow, error: bookmarkError }] =
+      await Promise.all([
+        loadRecipeMatch(supabase, context.householdId, id),
+        supabase
+          .from("recipe_bookmark")
+          .select("id")
+          .eq("household_id", context.householdId)
+          .eq("recipe_id", id)
+          .maybeSingle(),
+      ]);
+
+    if (bookmarkError) throw new Error(bookmarkError.message);
 
     if (!detail) {
       return NextResponse.json(
@@ -68,6 +79,7 @@ export async function GET(
       tip: row.tip,
       servingWeight: row.serving_weight,
       ingredientsText: row.ingredients_text,
+      bookmarked: bookmarkRow !== null,
     };
 
     return NextResponse.json(response);

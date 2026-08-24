@@ -289,6 +289,18 @@ export interface RecipeDetailResponse {
    * 근거로 화면 맨 아래에 접어서 둔다.
    */
   ingredientsText: string | null;
+  /** 이 가구가 담아뒀는지. 상세 화면 북마크 아이콘의 초기 상태. */
+  bookmarked: boolean;
+}
+
+/** POST/DELETE /api/recipes/[id]/bookmark */
+export interface RecipeBookmarkResponse {
+  bookmarked: boolean;
+}
+
+/** GET /api/recipes/bookmarks — 담은 순(최근 먼저). */
+export interface RecipeBookmarksResponse {
+  recipes: RecipeListItem[];
 }
 
 // ---------------------------------------------------------------------------

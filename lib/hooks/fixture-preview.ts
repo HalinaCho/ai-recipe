@@ -11,6 +11,8 @@ import type {
   MealPlanCandidatesResponse,
   MealPlanResponse,
   MealPlanSlot,
+  RecipeBookmarkResponse,
+  RecipeBookmarksResponse,
   RecipeDetailResponse,
   RecipeListItem,
   RecipeListResponse,
@@ -110,13 +112,29 @@ async function loadRecipesFixtureFile(): Promise<RecipesFixture> {
 
 export async function loadRecipeListFixture(
   categories: readonly string[] = [],
+  search = "",
 ): Promise<RecipeListResponse> {
   if (fixturePreviewMode() === "empty") return { recipes: [] };
   const { recipes } = await loadRecipesFixtureFile();
-  if (categories.length === 0) return { recipes };
+
+  const query = search.trim().toLowerCase();
+  const searched = query
+    ? recipes.filter(
+        (r) =>
+          r.name.toLowerCase().includes(query) ||
+          r.match.ownedMainIngredients.some((n) =>
+            n.toLowerCase().includes(query),
+          ) ||
+          r.match.missingMainIngredients.some((n) =>
+            n.toLowerCase().includes(query),
+          ),
+      )
+    : recipes;
+
+  if (categories.length === 0) return { recipes: searched };
   const wanted = new Set(categories);
   return {
-    recipes: recipes.filter((r) => wanted.has(r.category ?? "기타")),
+    recipes: searched.filter((r) => wanted.has(r.category ?? "기타")),
   };
 }
 
@@ -128,6 +146,33 @@ export async function loadTodayRecipesFixture(): Promise<TodayRecipesResponse> {
   return { date, recipes: recipes.slice(0, 3) };
 }
 
+// ---------------------------------------------------------------------------
+// 레시피 북마크 — 백엔드가 없으니 세션 메모리에 담긴 것을 기억한다
+// (mealPlanSwaps와 같은 요령).
+// ---------------------------------------------------------------------------
+
+const fixtureBookmarkedIds = new Set<string>();
+
+export async function toggleRecipeBookmarkFixture(
+  id: string,
+  next: boolean,
+): Promise<RecipeBookmarkResponse> {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  if (next) fixtureBookmarkedIds.add(id);
+  else fixtureBookmarkedIds.delete(id);
+  return { bookmarked: next };
+}
+
+export async function loadBookmarkedRecipesFixture(): Promise<RecipeBookmarksResponse> {
+  const { recipes } = await loadRecipesFixtureFile();
+  const byId = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+  return {
+    recipes: [...fixtureBookmarkedIds]
+      .reverse()
+      .flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])),
+  };
+}
+
 /** 파생 상세에 붙는 기본 조미료 — 화이트리스트라 매칭에서 빠진다는 걸 보여준다. */
 const DERIVED_SEASONINGS = ["소금", "간장", "참기름"];
 
@@ -135,7 +180,9 @@ export async function loadRecipeDetailFixture(
   id: string,
 ): Promise<RecipeDetailResponse> {
   const { recipes, detail } = await loadRecipesFixtureFile();
-  if (id === detail.id) return detail;
+  if (id === detail.id) {
+    return { ...detail, bookmarked: fixtureBookmarkedIds.has(id) };
+  }
 
   const listItem = recipes.find((recipe) => recipe.id === id);
   if (!listItem) {
@@ -146,6 +193,7 @@ export async function loadRecipeDetailFixture(
     id: listItem.id,
     name: listItem.name,
     imageUrl: listItem.imageUrl,
+    bookmarked: fixtureBookmarkedIds.has(listItem.id),
     // 사진이 없는 단계도 화면에서 어떻게 보이는지 확인할 수 있어야 한다 —
     // 실데이터는 100% 사진이 있지만, 다른 소스가 붙으면 빌 수 있다.
     instructions: [

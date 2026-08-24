@@ -3,6 +3,7 @@ import { TopAppBar } from "@/components/ui/TopAppBar";
 import { Card } from "@/components/ui/Card";
 
 const ENTRIES = [
+  { href: "/settings/bookmarks", label: "레시피 북마크" },
   { href: "/settings/mail-connections", label: "연결된 메일 계정" },
   { href: "/settings/household", label: "가구 구성원" },
   { href: "/settings/shopping-domains", label: "등록 쇼핑몰 발신 도메인" },
@@ -11,7 +12,7 @@ const ENTRIES = [
 export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-4">
-      <TopAppBar title="설정" />
+      <TopAppBar title="마이페이지" />
       <div className="px-container-padding flex flex-col gap-3">
         {ENTRIES.map((entry) => (
           <Link key={entry.href} href={entry.href}>

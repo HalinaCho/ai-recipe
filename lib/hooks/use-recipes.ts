@@ -30,23 +30,33 @@ export const cookChecklistQueryKey = (id: string) =>
 /**
  * GET /api/recipes — 매칭 점수 내림차순으로 서버가 이미 정렬해서 준다
  * (FR-09-02). 화면은 순서를 다시 만지지 않고 그대로 그린다.
+ *
+ * search는 재료명·레시피명 자유 검색어다. 있으면 후보 50개 제한과 무관하게
+ * 서버가 전체 레시피에서 찾는다 — "지금 있는 재료로 뭘 만들 수 있나"의
+ * 상위 몇 개만 클라이언트에서 걸러내면 원하는 레시피가 애초에 안 왔을 수
+ * 있어서다.
  */
-export function useRecipes(categories: readonly string[] = []) {
+export function useRecipes(categories: readonly string[] = [], search = "") {
   // 정렬해서 키를 만든다 — [반찬,국]과 [국,반찬]은 같은 요청인데 키가 다르면
   // 같은 목록을 두 번 받아 온다.
-  const key = [...categories].sort().join(",");
+  const categoryKey = [...categories].sort().join(",");
+  const searchKey = search.trim();
 
   return useQuery<RecipeListResponse>({
     // ["recipes"]가 접두사로 남아야 재고 변경 시 함께 무효화된다.
-    queryKey: [...RECIPES_QUERY_KEY, "list", key],
-    queryFn: () =>
-      isFixturePreview()
-        ? loadRecipeListFixture(categories)
-        : apiFetch<RecipeListResponse>(
-            key === ""
-              ? "/api/recipes"
-              : `/api/recipes?categories=${encodeURIComponent(key)}`,
-          ),
+    queryKey: [...RECIPES_QUERY_KEY, "list", categoryKey, searchKey],
+    queryFn: () => {
+      if (isFixturePreview()) {
+        return loadRecipeListFixture(categories, searchKey);
+      }
+      const params = new URLSearchParams();
+      if (categoryKey) params.set("categories", categoryKey);
+      if (searchKey) params.set("q", searchKey);
+      const qs = params.toString();
+      return apiFetch<RecipeListResponse>(
+        qs ? `/api/recipes?${qs}` : "/api/recipes",
+      );
+    },
     staleTime: 60_000,
     retry: 1,
   });

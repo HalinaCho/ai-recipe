@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { TopAppBar } from "@/components/ui/TopAppBar";
 import { PreviewBadge } from "@/components/ui/PreviewBadge";
 import { useRecipeDetail } from "@/lib/hooks/use-recipes";
+import { BookmarkButton } from "./BookmarkButton";
 import { CookChecklistModal } from "./CookChecklistModal";
 import {
   formatCalories,
@@ -77,7 +78,12 @@ export function RecipeDetailView({ id }: { id: string }) {
             />
 
             <header className="flex flex-col gap-3">
-              <h2 className="text-headline-lg text-on-surface">{data.name}</h2>
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="text-headline-lg text-on-surface">
+                  {data.name}
+                </h2>
+                <BookmarkButton recipeId={data.id} bookmarked={data.bookmarked} />
+              </div>
               {/* FR-06-04: 소스가 매긴 분류·조리방법. 100% 채워져 있는데
                   화면에서 안 쓰고 있었다 — "국&찌개 · 끓이기"만 봐도 어떤
                   음식이고 얼마나 손이 가는지 대충 잡힌다. */}

@@ -38,11 +38,11 @@ export default function HomePage() {
             </button>
             <Link
               href="/settings"
-              aria-label="설정"
+              aria-label="마이페이지"
               className="flex h-12 w-12 items-center justify-center rounded-full text-on-surface-variant transition-all active:scale-95"
             >
               <span className="material-symbols-outlined text-2xl">
-                settings
+                account_circle
               </span>
             </Link>
           </div>

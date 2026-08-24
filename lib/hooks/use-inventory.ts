@@ -17,6 +17,7 @@ import type {
 } from "@/types/api";
 import { apiFetch } from "./api-client";
 import { isFixturePreview, loadInventoryFixture } from "./fixture-preview";
+import { markInventoryChanged } from "./recipe-freshness";
 
 export const INVENTORY_QUERY_KEY = ["inventory"] as const;
 
@@ -32,6 +33,9 @@ export const INVENTORY_QUERY_KEY = ["inventory"] as const;
  * 다시 난다. 실제로 요리함만 레시피를 갈고 식단표는 빠뜨리고 있었다.
  */
 export function invalidateInventoryDerived(queryClient: QueryClient): void {
+  // 레시피 탭의 "재고가 바뀌었어요" 배지(recipe-freshness)가 여길 지켜본다 —
+  // 무효화 지점을 놓치면 배지도 함께 놓친다.
+  markInventoryChanged();
   for (const queryKey of [
     INVENTORY_QUERY_KEY,
     ["recipes"], // today·상세·요리함 체크리스트가 모두 이 접두사 아래에 있다

@@ -212,6 +212,52 @@ async function fetchCandidateRecipeIds(
   return [...new Set(rows.map((row) => row.recipe_id))];
 }
 
+/** LIKE/ILIKE 패턴의 와일드카드 문자를 문자 그대로 취급하게 이스케이프한다. */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[%_\\]/g, (char) => `\\${char}`);
+}
+
+/**
+ * 자유 검색어로 전체 레시피에서 찾는다. fetchCandidateRecipeIds는 "지금 있는
+ * 재료로 뭘 만들 수 있나"를 좁히는 함수라 검색에는 못 쓴다 — 검색은 반대로
+ * "이 재료·이름을 쓰는 레시피가 뭐가 있나"를 보유 여부와 상관없이 찾아야
+ * 한다. 이름과 주재료 둘 다 대상으로 하고(김치찌개 / 김치 둘 다 걸리게),
+ * 조미료는 검색해도 의미가 없어 주재료(role=main)만 본다.
+ */
+async function searchRecipeIds(
+  supabase: ServerSupabaseClient,
+  query: string,
+): Promise<string[]> {
+  const pattern = `%${escapeLikePattern(query)}%`;
+
+  const [byName, byIngredient] = await Promise.all([
+    fetchAllPages<Pick<RecipeRow, "id">>((from, to) =>
+      supabase
+        .from("recipe")
+        .select("id")
+        .ilike("name", pattern)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchAllPages<Pick<RecipeIngredientRow, "recipe_id">>((from, to) =>
+      supabase
+        .from("recipe_ingredient")
+        .select("recipe_id")
+        .eq("role", "main")
+        .ilike("normalized_name", pattern)
+        .order("recipe_id", { ascending: true })
+        .range(from, to),
+    ),
+  ]);
+
+  return [
+    ...new Set([
+      ...byName.map((row) => row.id),
+      ...byIngredient.map((row) => row.recipe_id),
+    ]),
+  ];
+}
+
 /** 재고가 아예 없는 가구용 폴백 — 목록 탭이 통째로 비지 않게 앞에서 몇 개. */
 async function fetchRecipeSample(
   supabase: ServerSupabaseClient,
@@ -252,17 +298,27 @@ export async function buildRankedRecipeList(
    * 뽑아야 어떤 분류를 골라도 목록이 제대로 찬다.
    */
   categories: readonly string[] = [],
+  /**
+   * 자유 검색어(레시피 검색 기능). 있으면 "보유 재료와 겹치는 것"이 아니라
+   * 이름·주재료에 이 문자열이 들어간 레시피 전체에서 찾는다. 검색 결과가
+   * 0건이면 재고 샘플로 대체하지 않는다 — "김치"를 검색했는데 엉뚱한
+   * 레시피가 나오면 검색이 고장난 것처럼 보인다.
+   */
+  query?: string,
 ): Promise<RecipeListItem[]> {
   const context = await loadHouseholdMatchContext(supabase, householdId, config);
-  const candidateIds = await fetchCandidateRecipeIds(
-    supabase,
-    context.ownedNames,
-  );
+  const trimmedQuery = query?.trim();
+
+  const candidateIds = trimmedQuery
+    ? await searchRecipeIds(supabase, trimmedQuery)
+    : await fetchCandidateRecipeIds(supabase, context.ownedNames);
 
   const all =
     candidateIds.length > 0
       ? await fetchScorableRecipes(supabase, candidateIds)
-      : await fetchRecipeSample(supabase, limit);
+      : trimmedQuery
+        ? []
+        : await fetchRecipeSample(supabase, limit);
 
   const wanted = new Set(categories);
   const recipes =
@@ -276,6 +332,51 @@ export async function buildRankedRecipeList(
     context.expiringNames,
     config,
   ).slice(0, limit);
+}
+
+// ---------------------------------------------------------------------------
+// 레시피 북마크 — 가구가 공유하는 저장 목록
+// ---------------------------------------------------------------------------
+
+/**
+ * 이 가구가 담은 레시피를 최근에 담은 순으로 준다. 매칭 점수 순이 아니라
+ * 담은 순서인 이유는 이 목록의 성격이 "지금 만들기 좋은 것"이 아니라
+ * "나중에 보려고 챙겨둔 것"이라서다 — 방금 담은 게 맨 위에 있어야 한다.
+ *
+ * 매칭 정보는 목록/상세와 똑같이 **현재 재고 기준으로 매번 다시 계산**한다
+ * (getOrCreateTodayRecipes와 같은 이유 — 담을 당시 재고를 그대로 우기면
+ * 이미 다 써버린 재료를 "보유"라고 표시하게 된다).
+ */
+export async function listBookmarkedRecipes(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
+): Promise<RecipeListItem[]> {
+  const { data, error } = await supabase
+    .from("recipe_bookmark")
+    .select("recipe_id")
+    .eq("household_id", householdId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  const bookmarkedIds = (data ?? []).map((row) => row.recipe_id);
+  if (bookmarkedIds.length === 0) return [];
+
+  const context = await loadHouseholdMatchContext(supabase, householdId, config);
+  const recipes = await fetchScorableRecipes(supabase, bookmarkedIds);
+  const byId = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+
+  return bookmarkedIds.flatMap((recipeId) => {
+    const recipe = byId.get(recipeId);
+    if (!recipe) return []; // 담은 뒤 레시피 자체가 지워진 경우
+    const match = scoreRecipe(
+      recipe,
+      context.ownedNames,
+      context.expiringNames,
+      config,
+    );
+    return [toListItem(recipe, match, config)];
+  });
 }
 
 // ---------------------------------------------------------------------------

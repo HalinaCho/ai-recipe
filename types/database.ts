@@ -324,6 +324,25 @@ export interface Database {
         >;
         Relationships: [];
       };
+      // 0013_recipe_bookmark.sql — 가구가 공유하는 레시피 저장 목록.
+      recipe_bookmark: {
+        Row: {
+          id: string;
+          household_id: string;
+          recipe_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          recipe_id: string;
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["recipe_bookmark"]["Insert"]
+        >;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
