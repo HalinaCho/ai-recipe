@@ -5,12 +5,22 @@
 // 넘겨서 한다 (모든 함수가 config를 마지막 인자로 받는다).
 
 export interface MatchingConfig {
-  /** FR-08-01 공식의 두 항. 합이 1이 되도록 유지한다. */
+  /**
+   * FR-08-01 공식의 세 항. 합이 1이 되도록 유지한다.
+   *
+   * preference는 추천 알고리즘 V2 Level 1에서 추가됐다 — 재고 소진이
+   * 추천의 유일한 축이면 "오늘 먹고 싶지 않은 음식"이 계속 1순위로 뜬다.
+   * 취향 신호(취향 퀴즈·북마크·요리 이력)가 하나도 없는 가구는 이 항이
+   * 0으로 취급되고 나머지 두 항으로 비례 재배분된다(score.ts의
+   * `effectiveWeights` 참고) — 신호가 없다고 손해 보지 않는다.
+   */
   weights: {
     /** 보유 주재료 비율에 붙는 가중치. */
     availability: number;
     /** 소진임박 재료 포함 비율에 붙는 가중치. */
     expiring: number;
+    /** 선호 재료 겹침(부호 있음, 좋아요는 +·싫어요는 -)에 붙는 가중치. */
+    preference: number;
   };
   /**
    * "소진임박 TOP N"의 N. 재고를 FIFO(구매일 오래된 순, FR-04-02)로 줄 세운 뒤
@@ -35,7 +45,7 @@ export interface MatchingConfig {
 }
 
 export const DEFAULT_MATCHING_CONFIG: MatchingConfig = {
-  weights: { availability: 0.6, expiring: 0.4 },
+  weights: { availability: 0.45, expiring: 0.2, preference: 0.35 },
   expiringTopN: 5,
   mealKitCtaBand: { min: 0.4, max: 0.7 },
   todayRecipeCount: 3,

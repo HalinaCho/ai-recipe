@@ -496,3 +496,30 @@ export interface UpdateMealPlanEntryResponse {
   /** 교체로 부족 재료가 바뀌므로 주간 영양 합계도 함께 돌려준다. */
   nutrition: WeeklyNutritionSummary;
 }
+
+// ---------------------------------------------------------------------------
+// 추천 알고리즘 V2 Level 1 — 취향 퀴즈
+// ---------------------------------------------------------------------------
+
+export type RecipePreferenceRating = "like" | "neutral" | "dislike";
+
+/** 퀴즈 카드 한 장. 현재 재고와 무관하게 취향만 묻는 자리라 매칭 정보는 없다. */
+export interface PreferenceQuizCard {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  category: string | null;
+}
+
+/** GET /api/recipes/preference-quiz — 아직 평가하지 않은 카드를 종류별로 섞어 준다. */
+export interface PreferenceQuizResponse {
+  cards: PreferenceQuizCard[];
+  /** 이미 평가한 개수. "지금까지 12개 평가했어요" 같은 진행 표시에 쓴다. */
+  ratedCount: number;
+}
+
+/** POST /api/recipes/preference-quiz — 카드 한 장 평가. */
+export interface SubmitPreferenceRequest {
+  recipeId: string;
+  rating: RecipePreferenceRating;
+}

@@ -67,19 +67,57 @@ export function selectExpiringNames(
   return names;
 }
 
+/** 신호가 없을 때 기본값으로 쓰는 빈 집합. 매 호출마다 새로 만들지 않는다. */
+const EMPTY_NAMES: ReadonlySet<string> = new Set();
+
+/**
+ * 추천 V2 Level 1: 취향 신호(퀴즈·북마크·요리 이력)가 하나도 없는 가구는
+ * preference 항을 0으로 두고, 그 몫을 availability·expiring에 **비례
+ * 재배분**한다 — 신호가 없다고 그 가구의 추천이 손해를 봐서는 안 된다
+ * (합은 항상 1을 유지). 신호가 있으면 config 그대로 쓴다.
+ *
+ * preference가 이미 0인 config(예: 옛 2항 공식을 흉내 낸 테스트/설정)는
+ * 재배분해도 결과가 그대로다 — remaining으로 나눈 몫에 0을 곱하기 때문.
+ */
+export function resolveWeights(
+  config: MatchingConfig,
+  hasPreferenceSignal: boolean,
+): MatchingConfig["weights"] {
+  const { availability, expiring, preference = 0 } = config.weights;
+  if (hasPreferenceSignal || preference === 0) {
+    return { availability, expiring, preference };
+  }
+  const remaining = availability + expiring;
+  if (remaining <= 0) return { availability, expiring, preference };
+  return {
+    availability: availability + preference * (availability / remaining),
+    expiring: expiring + preference * (expiring / remaining),
+    preference: 0,
+  };
+}
+
 /**
  * FR-08-01의 공식:
  *   score = 보유 주재료 비율 × w.availability
  *         + 주재료 중 소진임박 TOP N 포함 비율 × w.expiring
+ *         + 선호 재료 겹침(부호 있음) × w.preference   (V2 Level 1)
  *
  * 주재료가 하나도 없는 레시피(조미료만 적혔거나 수집이 덜 된 행)는 0점이다.
  * 0/0을 1로 봐서 "완벽 매칭"으로 올려버리면, 데이터가 부실한 레시피가
  * 추천 최상단을 차지한다.
+ *
+ * preferredNames·dislikedNames는 취향 퀴즈(좋아요/싫어요)·북마크·요리 이력에서
+ * 모은 "재료" 집합이다(레시피 단위가 아니라 재료 단위로 일반화 — 카레를
+ * 좋아하면 다른 카레류도 가산점을 받는다). 두 집합 모두 비어 있으면 이
+ * 가구는 아직 취향 신호가 없는 것으로 보고 `resolveWeights`가 가중치를
+ * 재배분한다.
  */
 export function scoreRecipe(
   recipe: ScorableRecipe,
   ownedNames: ReadonlySet<string>,
   expiringNames: ReadonlySet<string>,
+  preferredNames: ReadonlySet<string> = EMPTY_NAMES,
+  dislikedNames: ReadonlySet<string> = EMPTY_NAMES,
   config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
 ): RecipeMatch {
   const mainNames = mainIngredientNames(recipe);
@@ -111,10 +149,27 @@ export function scoreRecipe(
   const matchRate = owned.length / mainNames.length;
   const expiringRate = expiring.length / mainNames.length;
 
+  const hasPreferenceSignal = preferredNames.size > 0 || dislikedNames.size > 0;
+  const preferredCount = mainNames.filter((name) =>
+    preferredNames.has(name),
+  ).length;
+  const dislikedCount = mainNames.filter((name) =>
+    dislikedNames.has(name),
+  ).length;
+  // -1~1: 싫어하는 재료 겹침이 좋아하는 재료 겹침을 그대로 상쇄한다.
+  const preferenceRate = (preferredCount - dislikedCount) / mainNames.length;
+
+  const weights = resolveWeights(config, hasPreferenceSignal);
+
   return {
-    score:
-      matchRate * config.weights.availability +
-      expiringRate * config.weights.expiring,
+    // 싫어요가 강하게 몰리면 이론상 음수가 나올 수 있다 — 화면은 매칭률을
+    // %로 그리므로 0 밑으로는 내려가지 않게 자른다.
+    score: Math.max(
+      0,
+      matchRate * weights.availability +
+        expiringRate * weights.expiring +
+        preferenceRate * weights.preference,
+    ),
     matchRate,
     ownedMainIngredients: owned,
     missingMainIngredients: missing,
@@ -163,13 +218,22 @@ export function rankRecipes(
   recipes: ScorableRecipe[],
   ownedNames: ReadonlySet<string>,
   expiringNames: ReadonlySet<string>,
+  preferredNames: ReadonlySet<string> = EMPTY_NAMES,
+  dislikedNames: ReadonlySet<string> = EMPTY_NAMES,
   config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
 ): RecipeListItem[] {
   return recipes
     .map((recipe) =>
       toListItem(
         recipe,
-        scoreRecipe(recipe, ownedNames, expiringNames, config),
+        scoreRecipe(
+          recipe,
+          ownedNames,
+          expiringNames,
+          preferredNames,
+          dislikedNames,
+          config,
+        ),
         config,
       ),
     )

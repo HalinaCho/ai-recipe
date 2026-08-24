@@ -3,6 +3,7 @@ import { getHouseholdContext } from "@/lib/inventory/household-context";
 import {
   buildCookChecklist,
   consumeItemsForRecipe,
+  logRecipeCooked,
 } from "@/lib/recipes/matching/queries";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -107,6 +108,10 @@ export async function POST(
       ids,
       body?.remainingFractions ?? {},
     );
+
+    // V2 Level 1: 체크를 몇 개 해제했든 "이 레시피로 요리함"을 누른 행동
+    // 자체가 취향 신호다 — consumedCount(재고 변화)와는 별개로 항상 남긴다.
+    await logRecipeCooked(supabase, context.householdId, id);
 
     // 체크를 전부 해제하고 눌렀으면 0건이 정상이다. 이미 소진된 항목을
     // 다시 보내도 마찬가지 — 실패가 아니라 "바뀐 게 없음"이다.

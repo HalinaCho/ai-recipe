@@ -44,7 +44,7 @@ import {
   type MatchingConfig,
 } from "@/lib/recipes/matching/config";
 import { isMealSuitable } from "@/lib/recipes/meal-suitability";
-import { fetchAllPages } from "@/lib/recipes/matching/queries";
+import { fetchAllPages, loadPreferenceSignals } from "@/lib/recipes/matching/queries";
 import {
   rankRecipes,
   selectExpiringNames,
@@ -208,6 +208,9 @@ export interface MealPlanContext {
   inventory: { normalizedName: string }[];
   ownedNames: Set<string>;
   purchaseShares: Map<IngredientCategory, number>;
+  /** V2 Level 1: 레시피 탭과 같은 취향 신호. 후보 풀 선정에 반영한다. */
+  preferredNames: Set<string>;
+  dislikedNames: Set<string>;
 }
 
 /**
@@ -219,7 +222,10 @@ export async function loadMealPlanContext(
   householdId: string,
   config: MealPlanConfig = DEFAULT_MEAL_PLAN_CONFIG,
 ): Promise<MealPlanContext> {
-  const items = await listInStockItems(supabase, householdId);
+  const [items, signals] = await Promise.all([
+    listInStockItems(supabase, householdId),
+    loadPreferenceSignals(supabase, householdId),
+  ]);
   const today = todayInSeoul();
 
   // FR-13-04: 다양성 보너스는 **구매** 이력을 본다. 이미 다 먹어치운 항목도
@@ -264,6 +270,8 @@ export async function loadMealPlanContext(
       today,
       config,
     ),
+    preferredNames: signals.preferredNames,
+    dislikedNames: signals.dislikedNames,
   };
 }
 
@@ -305,6 +313,8 @@ export async function loadCandidatePool(
     overlapping,
     context.ownedNames,
     expiringNames,
+    context.preferredNames,
+    context.dislikedNames,
     matchingConfig,
   ).slice(0, config.candidatePoolSize);
 

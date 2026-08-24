@@ -7,7 +7,7 @@ import {
 } from "@/lib/ingredients/aliases";
 import { listInStockItems } from "@/lib/inventory/queries";
 import type { ServerSupabaseClient } from "@/lib/inventory/types";
-import { isMealSuitable } from "@/lib/recipes/meal-suitability";
+import { isMealSuitable, RECIPE_CATEGORIES } from "@/lib/recipes/meal-suitability";
 import {
   DEFAULT_MATCHING_CONFIG,
   type MatchingConfig,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/recipes/matching/score";
 import type {
   CookChecklistItem,
+  PreferenceQuizCard,
   RecipeListItem,
   RecipeMatch,
 } from "@/types/api";
@@ -65,6 +66,10 @@ export interface HouseholdMatchContext {
   items: Awaited<ReturnType<typeof listInStockItems>>;
   ownedNames: Set<string>;
   expiringNames: Set<string>;
+  /** V2 Level 1: 취향 퀴즈 좋아요 + 북마크 + 요리 이력에서 모은 선호 재료. */
+  preferredNames: Set<string>;
+  /** V2 Level 1: 취향 퀴즈 싫어요에서 모은 재료. */
+  dislikedNames: Set<string>;
 }
 
 /**
@@ -76,7 +81,10 @@ export async function loadHouseholdMatchContext(
   householdId: string,
   config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
 ): Promise<HouseholdMatchContext> {
-  const items = await listInStockItems(supabase, householdId);
+  const [items, signals] = await Promise.all([
+    listInStockItems(supabase, householdId),
+    loadPreferenceSignals(supabase, householdId),
+  ]);
   return {
     items,
     // FR-07-05: 대표 이름으로 모아 둔다. 레시피 재료 쪽(toScorable)도 같은
@@ -85,7 +93,187 @@ export async function loadHouseholdMatchContext(
       items.map((item) => canonicalIngredient(item.normalizedName)),
     ),
     expiringNames: selectExpiringNames(items, config),
+    preferredNames: signals.preferredNames,
+    dislikedNames: signals.dislikedNames,
   };
+}
+
+export interface PreferenceSignals {
+  preferredNames: Set<string>;
+  dislikedNames: Set<string>;
+}
+
+/**
+ * 취향 신호를 "재료" 집합으로 모은다 (V2 Level 1).
+ *
+ * 레시피 단위가 아니라 재료 단위로 일반화하는 이유: 카레 하나를 좋아요
+ * 했다고 그 카레 레시피만 올려서는 취향 반영이 거의 안 느껴진다. 재료로
+ * 모으면 "카레류 전체"가 함께 오른다.
+ *
+ * 좋아요(recipe_preference.rating='like') + 북마크(recipe_bookmark) + 요리
+ * 이력(recipe_cook_log)을 전부 "좋아하는 쪽" 신호로 합친다 — 담아두거나
+ * 실제로 만들어 먹은 것도 명시적 좋아요만큼 강한 신호다. '보통'(neutral)은
+ * 어느 쪽도 아니다 — 신호 없음이 아니라 "그저 그렇다"는 명시적 중립이므로
+ * 가산·감산 어느 쪽에도 넣지 않는다.
+ */
+export async function loadPreferenceSignals(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+): Promise<PreferenceSignals> {
+  const [
+    { data: preferenceRows, error: preferenceError },
+    { data: bookmarkRows, error: bookmarkError },
+    { data: cookRows, error: cookError },
+  ] = await Promise.all([
+    supabase
+      .from("recipe_preference")
+      .select("recipe_id, rating")
+      .eq("household_id", householdId),
+    supabase
+      .from("recipe_bookmark")
+      .select("recipe_id")
+      .eq("household_id", householdId),
+    supabase
+      .from("recipe_cook_log")
+      .select("recipe_id")
+      .eq("household_id", householdId),
+  ]);
+
+  if (preferenceError) throw new Error(preferenceError.message);
+  if (bookmarkError) throw new Error(bookmarkError.message);
+  if (cookError) throw new Error(cookError.message);
+
+  const likedRecipeIds = new Set<string>();
+  const dislikedRecipeIds = new Set<string>();
+
+  for (const row of preferenceRows ?? []) {
+    if (row.rating === "like") likedRecipeIds.add(row.recipe_id);
+    else if (row.rating === "dislike") dislikedRecipeIds.add(row.recipe_id);
+  }
+  for (const row of bookmarkRows ?? []) likedRecipeIds.add(row.recipe_id);
+  for (const row of cookRows ?? []) likedRecipeIds.add(row.recipe_id);
+
+  const allIds = [...new Set([...likedRecipeIds, ...dislikedRecipeIds])];
+  if (allIds.length === 0) {
+    return { preferredNames: new Set(), dislikedNames: new Set() };
+  }
+
+  const recipes = await fetchScorableRecipes(supabase, allIds);
+  const byId = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+
+  const preferredNames = new Set<string>();
+  const dislikedNames = new Set<string>();
+  for (const id of likedRecipeIds) {
+    const recipe = byId.get(id);
+    if (!recipe) continue;
+    for (const name of mainIngredientNames(recipe)) preferredNames.add(name);
+  }
+  for (const id of dislikedRecipeIds) {
+    const recipe = byId.get(id);
+    if (!recipe) continue;
+    for (const name of mainIngredientNames(recipe)) dislikedNames.add(name);
+  }
+
+  return { preferredNames, dislikedNames };
+}
+
+/** "요리함" 처리 이력에 한 줄 남긴다. 실패해도 재고 소진 자체는 막지 않는다. */
+export async function logRecipeCooked(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  recipeId: string,
+): Promise<void> {
+  const { error } = await supabase.from("recipe_cook_log").insert({
+    household_id: householdId,
+    recipe_id: recipeId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** 카드 순서·후보 순서를 매번 다르게 섞는다 (Fisher–Yates). */
+function shuffled<T>(items: readonly T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+/** 카테고리 하나에서 넉넉히 받아 섞은 뒤 자른다 — 매번 앞쪽 몇 개만 나오는 걸 막는다. */
+const QUIZ_SAMPLE_MULTIPLIER = 4;
+
+/**
+ * 취향 퀴즈 후보 (마이페이지 → 취향 설정, V2 Level 1).
+ *
+ * 요리종류(RCP_PAT2) 전반에서 고르게 뽑는다 — 반찬에만 몰리면 "취향"이
+ * 아니라 "반찬 취향"만 파악된다. 이미 평가한 레시피는 뺀다(다시 열어도
+ * 새 카드가 나오게).
+ */
+export async function loadPreferenceQuizCandidates(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  count: number,
+): Promise<PreferenceQuizCard[]> {
+  const { data: ratedRows, error: ratedError } = await supabase
+    .from("recipe_preference")
+    .select("recipe_id")
+    .eq("household_id", householdId);
+  if (ratedError) throw new Error(ratedError.message);
+  const ratedIds = new Set((ratedRows ?? []).map((row) => row.recipe_id));
+
+  const perCategory = Math.max(1, Math.ceil(count / RECIPE_CATEGORIES.length));
+  const picked: PreferenceQuizCard[] = [];
+
+  for (const category of RECIPE_CATEGORIES) {
+    const { data, error } = await supabase
+      .from("recipe")
+      .select("id, name, image_url, category")
+      .eq("category", category)
+      .limit(perCategory * QUIZ_SAMPLE_MULTIPLIER);
+    if (error) throw new Error(error.message);
+
+    const pool = (data ?? []).filter((row) => !ratedIds.has(row.id));
+    picked.push(
+      ...shuffled(pool)
+        .slice(0, perCategory)
+        .map((row) => ({
+          id: row.id,
+          name: row.name,
+          imageUrl: row.image_url,
+          category: row.category,
+        })),
+    );
+  }
+
+  return shuffled(picked).slice(0, count);
+}
+
+/** 이 가구가 지금까지 평가한 카드 수 — 퀴즈 화면의 진행 표시에 쓴다. */
+export async function countPreferenceRatings(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("recipe_preference")
+    .select("id", { count: "exact", head: true })
+    .eq("household_id", householdId);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+/** 취향 퀴즈 카드 한 장을 평가(또는 재평가)한다. */
+export async function submitPreferenceRating(
+  supabase: ServerSupabaseClient,
+  householdId: string,
+  recipeId: string,
+  rating: "like" | "neutral" | "dislike",
+): Promise<void> {
+  const { error } = await supabase.from("recipe_preference").upsert(
+    { household_id: householdId, recipe_id: recipeId, rating },
+    { onConflict: "household_id,recipe_id" },
+  );
+  if (error) throw new Error(error.message);
 }
 
 function toScorable(
@@ -330,6 +518,8 @@ export async function buildRankedRecipeList(
     recipes,
     context.ownedNames,
     context.expiringNames,
+    context.preferredNames,
+    context.dislikedNames,
     config,
   ).slice(0, limit);
 }
@@ -373,6 +563,8 @@ export async function listBookmarkedRecipes(
       recipe,
       context.ownedNames,
       context.expiringNames,
+      context.preferredNames,
+      context.dislikedNames,
       config,
     );
     return [toListItem(recipe, match, config)];
@@ -416,6 +608,8 @@ export async function getOrCreateTodayRecipes(
       ),
       context.ownedNames,
       context.expiringNames,
+      context.preferredNames,
+      context.dislikedNames,
       config,
     )
       // 겹치는 재료가 하나도 없는 레시피를 "오늘의 추천"으로 내밀 이유는 없다.
@@ -452,6 +646,8 @@ export async function getOrCreateTodayRecipes(
       recipe,
       context.ownedNames,
       context.expiringNames,
+      context.preferredNames,
+      context.dislikedNames,
       config,
     );
     return [toListItem(recipe, match, config)];
@@ -518,6 +714,8 @@ export async function loadRecipeMatch(
       recipe,
       context.ownedNames,
       context.expiringNames,
+      context.preferredNames,
+      context.dislikedNames,
       config,
     ),
     context,

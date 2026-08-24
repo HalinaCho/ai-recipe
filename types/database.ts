@@ -343,6 +343,46 @@ export interface Database {
         >;
         Relationships: [];
       };
+      // 0014_recipe_preference.sql — 취향 퀴즈에서 매긴 좋아요/보통/싫어요.
+      recipe_preference: {
+        Row: {
+          id: string;
+          household_id: string;
+          recipe_id: string;
+          rating: "like" | "neutral" | "dislike";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          recipe_id: string;
+          rating: "like" | "neutral" | "dislike";
+          created_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["recipe_preference"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      // 0014_recipe_preference.sql — "요리함" 이력 (어떤 레시피를 요리했는지).
+      recipe_cook_log: {
+        Row: {
+          id: string;
+          household_id: string;
+          recipe_id: string;
+          cooked_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          recipe_id: string;
+          cooked_at?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["recipe_cook_log"]["Insert"]
+        >;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

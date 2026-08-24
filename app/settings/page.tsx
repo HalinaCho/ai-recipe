@@ -3,6 +3,7 @@ import { TopAppBar } from "@/components/ui/TopAppBar";
 import { Card } from "@/components/ui/Card";
 
 const ENTRIES = [
+  { href: "/settings/preference-quiz", label: "취향 설정" },
   { href: "/settings/bookmarks", label: "레시피 북마크" },
   { href: "/settings/mail-connections", label: "연결된 메일 계정" },
   { href: "/settings/household", label: "가구 구성원" },
